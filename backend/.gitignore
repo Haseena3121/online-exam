@@ -1,0 +1,151 @@
+# ============================================
+# Backend .gitignore
+# ============================================
+
+# ============ Environment Variables ============
+.env
+.env.local
+.env.*.local
+.env.production
+
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ============ Flask ============
+instance/
+.webassets-cache
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============ Database ============
+*.db
+*.sqlite
+*.sqlite3
+database.sqlite
+database.sqlite3
+
+# ============ IDE & Editors ============
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ============ OS ============
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============ Logs ============
+logs/
+*.log
+*.log.*
+
+# ============ Build & Distribution ============
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ============ Testing ============
+.pytest_cache/
+.tox/
+coverage.xml
+htmlcov/
+.coverage
+.coverage.*
+
+# ============ Upload Folders ============
+uploads/
+uploads/*
+!uploads/.gitkeep
+
+# ============ Local Development ============
+.venv/
+local_settings.py
+db.sqlite3
+/media
+
+# ============ IDE specific files ============
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# ============ Temporary files ============
+*.tmp
+*.bak
+*.swp
+*~
+.#*
+
+# ============ Node modules (if using node tools) ============
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ============ Docker ============
+.docker/
+.dockerignore
+
+# ============ Git ============
+.git
+.gitignore
+.gitattributes
+
+# ============ Migrations (except existing ones) ============
+migrations/versions/*.py
+!migrations/versions/001_*.py
+
+# ============ Celery ============
+celerybeat-schedule
+celerybeat.pid
+
+# ============ Misc ============
+.python-version
+Dockerfile.local
+docker-compose.local.yml

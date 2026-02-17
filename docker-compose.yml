@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+
+  # =========================
+  # MySQL Database
+  # =========================
+  mysql:
+    image: mysql:8.0
+    container_name: exam_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: online_exam_proctoring
+      MYSQL_USER: exam_user
+      MYSQL_PASSWORD: exam_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # =========================
+  # Redis Cache
+  # =========================
+  redis:
+    image: redis:7
+    container_name: exam_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # =========================
+  # Backend Flask App
+  # =========================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: exam_backend
+    restart: always
+    depends_on:
+      - mysql
+      - redis
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: mysql+pymysql://exam_user:exam_password@mysql/online_exam_proctoring
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: your-super-secret-key
+      FLASK_ENV: production
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+
+volumes:
+  mysql_data:

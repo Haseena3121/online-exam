@@ -1,0 +1,72 @@
+# Flask Core
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-JWT-Extended==4.5.3
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+Flask-Mail==0.9.1
+
+# Database
+PyMySQL==1.1.0
+SQLAlchemy==2.0.23
+alembic==1.12.1
+
+# Environment
+python-dotenv==1.0.0
+
+# Security
+Werkzeug==3.0.1
+PyJWT==2.10.1
+bcrypt==4.1.1
+
+# AI/ML Core
+opencv-python==4.8.1.78
+numpy==1.24.3
+Pillow==10.0.1
+scikit-learn==1.3.2
+
+# MediaPipe (Face, Hand, Pose Detection)
+mediapipe==0.10.7
+
+# TensorFlow & Models
+tensorflow==2.14.0
+tensorflow-hub==0.14.0
+
+# Audio Processing
+librosa==0.10.0
+soundfile==0.12.1
+scipy==1.11.4
+python-speech-features==0.6
+
+# Real-time & WebSocket
+python-socketio==5.9.0
+python-engineio==4.7.1
+
+# Cache & Task Queue
+redis==5.0.1
+celery==5.3.4
+
+# HTTP & Requests
+requests==2.31.0
+aiohttp==3.9.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Production Server
+gunicorn==21.2.0
+gevent==23.9.1
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-flask==1.3.0
+
+# Code Quality
+pylint==3.0.3
+flake8==6.1.0
+black==23.12.0
+
+# Monitoring
+python-json-logger==2.0.7

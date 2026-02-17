@@ -4,19 +4,17 @@
   "description": "Advanced Online Exam Proctoring System with AI-based violation detection",
   "private": true,
   "dependencies": {
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs": "^4.11.0",
+    "ajv": "^6.12.6",
+    "axios": "^1.4.0",
+    "date-fns": "^2.30.0",
+    "js-cookie": "^3.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.14.0",
-    "axios": "^1.4.0",
-    "tensorflow": "^4.11.0",
-    "tensorflow-models": "^2.6.0",
-    "@tensorflow/tfjs": "^4.11.0",
-    "@tensorflow-models/facemesh": "^0.0.5",
-    "@tensorflow-models/coco-ssd": "^2.2.3",
-    "socket.io-client": "^4.7.0",
-    "js-cookie": "^3.0.5",
-    "date-fns": "^2.30.0",
-    "react-scripts": "5.0.1"
+    "react-scripts": "5.0.1",
+    "socket.io-client": "^4.7.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

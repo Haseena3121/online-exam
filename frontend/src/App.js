@@ -1,13 +1,20 @@
-import React, { createContext, useContext } from 'react';
+import { useEffect } from "react";
+import axios from "axios";
 
-export const AuthContext = createContext(null);
+function App() {
+  useEffect(() => {
+    axios.get("http://127.0.0.1:5000/health")
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
+      .then(res => console.log(res.data))
+      .catch(err => console.error(err));
+  }, []);
 
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  return (
+    <div style={{ textAlign: "center", marginTop: "100px" }}>
+      <h1>🎓 Online Exam Proctoring System</h1>
+      <p>Frontend Connected to Backend 🚀</p>
+    </div>
+  );
+}
 
-  return context;
-};
+export default App;
