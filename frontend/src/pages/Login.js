@@ -8,10 +8,12 @@ function Login() {
     email: '',
     password: ''
   });
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
-  const { handleLogin } = useAuth();
+  const { login } = useAuth();   // ✅ FIXED
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -42,11 +44,18 @@ function Login() {
         return;
       }
 
-      handleLogin(data.user, data.access_token);
-      navigate('/');
+      // ✅ Save user + token
+      login(data.user, data.access_token);
+
+      // ✅ Role-based navigation
+      if (data.user.role === "examiner") {
+        navigate("/examiner-dashboard");
+      } else {
+        navigate("/dashboard");
+      }
+
     } catch (err) {
       setError('An error occurred. Please try again.');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -59,9 +68,9 @@ function Login() {
           <h1>📚 Exam Proctoring</h1>
           <p>Secure Online Examinations</p>
         </div>
-        
+
         {error && <div className="error-message">{error}</div>}
-        
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="email">📧 Email</label>
@@ -71,7 +80,6 @@ function Login() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="your.email@example.com"
               required
             />
           </div>
@@ -84,18 +92,23 @@ function Login() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="Enter your password"
               required
             />
           </div>
 
-          <button type="submit" disabled={loading} className="btn btn-primary btn-block">
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn btn-primary btn-block"
+          >
             {loading ? '⏳ Logging in...' : '✓ Login'}
           </button>
         </form>
 
         <div className="auth-footer">
-          <p>Don't have an account? <Link to="/register">Register here</Link></p>
+          <p>
+            Don't have an account? <Link to="/register">Register here</Link>
+          </p>
         </div>
       </div>
     </div>

@@ -1,19 +1,39 @@
-import { useEffect } from "react";
-import axios from "axios";
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import ExaminarDashboard from "./pages/ExaminarDashboard";
+import ExamInterface from "./pages/ExamInterface";
+import ExamList from "./pages/ExamList";
+import Results from "./pages/Results";
+import AcceptanceForm from "./pages/AcceptanceForm";
+import ViolationDetails from "./pages/ViolationDetails";
+import CreateExam from "./pages/CreateExam";
 
 function App() {
-  useEffect(() => {
-    axios.get("http://127.0.0.1:5000/health")
-
-      .then(res => console.log(res.data))
-      .catch(err => console.error(err));
-  }, []);
-
   return (
-    <div style={{ textAlign: "center", marginTop: "100px" }}>
-      <h1>🎓 Online Exam Proctoring System</h1>
-      <p>Frontend Connected to Backend 🚀</p>
-    </div>
+    <Router>
+      <Routes>
+        {/* Auth Routes */}
+        <Route path="/" element={<Login />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+
+        {/* Student Routes */}
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/exam-list" element={<ExamList />} />
+        <Route path="/exam" element={<ExamInterface />} />
+        <Route path="/results" element={<Results />} />
+        <Route path="/acceptance" element={<AcceptanceForm />} />
+
+        {/* Examiner Routes */}
+        <Route path="/examiner-dashboard" element={<ExaminarDashboard />} />
+        <Route path="/violation-details" element={<ViolationDetails />} />
+        <Route path="/create-exam" element={<CreateExam />} />
+      </Routes>
+    </Router>
   );
 }
 

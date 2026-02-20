@@ -19,12 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     make \
-    mysql-client \
+    mariadb-client-compat \
     postgresql-client \
     curl \
     wget \
     git \
-    libmysqlclient-dev \
+    libmariadb-dev \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
