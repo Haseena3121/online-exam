@@ -25,7 +25,7 @@ function ExamList() {
 
   const fetchExams = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/exams', {
+      const response = await fetch('http://localhost:5000/api/exams/', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

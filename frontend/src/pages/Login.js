@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import '../styles/Auth.css';
 
 function Login() {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
-
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
-  const { login } = useAuth();   // ✅ FIXED
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -44,10 +42,8 @@ function Login() {
         return;
       }
 
-      // ✅ Save user + token
       login(data.user, data.access_token);
 
-      // ✅ Role-based navigation
       if (data.user.role === "examiner") {
         navigate("/examiner-dashboard");
       } else {
@@ -55,59 +51,138 @@ function Login() {
       }
 
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError('Network error. Please check if the backend server is running.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1>📚 Exam Proctoring</h1>
-          <p>Secure Online Examinations</p>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: '15px',
+        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+        padding: '40px',
+        width: '100%',
+        maxWidth: '450px'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <h1 style={{ fontSize: '28px', color: '#667eea', margin: '0 0 10px 0' }}>
+            📚 Exam Proctoring
+          </h1>
+          <p style={{ color: '#999', margin: '0' }}>
+            Secure Online Examinations
+          </p>
         </div>
 
-        {error && <div className="error-message">{error}</div>}
+        {error && (
+          <div style={{
+            background: '#ffebee',
+            borderLeft: '4px solid #f44336',
+            color: '#c62828',
+            padding: '12px 15px',
+            borderRadius: '4px',
+            marginBottom: '20px',
+            fontSize: '14px'
+          }}>
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">📧 Email</label>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              color: '#333',
+              fontWeight: '600',
+              fontSize: '14px'
+            }}>
+              📧 Email
+            </label>
             <input
-              id="email"
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
               required
+              style={{
+                width: '100%',
+                padding: '12px 15px',
+                border: '2px solid #e0e0e0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">🔒 Password</label>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              color: '#333',
+              fontWeight: '600',
+              fontSize: '14px'
+            }}>
+              🔒 Password
+            </label>
             <input
-              id="password"
               type="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
               required
+              style={{
+                width: '100%',
+                padding: '12px 15px',
+                border: '2px solid #e0e0e0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="btn btn-primary btn-block"
+            style={{
+              width: '100%',
+              padding: '12px 24px',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              opacity: loading ? 0.6 : 1,
+              marginBottom: '10px'
+            }}
           >
             {loading ? '⏳ Logging in...' : '✓ Login'}
           </button>
         </form>
 
-        <div className="auth-footer">
+        <div style={{ textAlign: 'center', marginTop: '20px', color: '#666', fontSize: '14px' }}>
           <p>
-            Don't have an account? <Link to="/register">Register here</Link>
+            Don't have an account?{' '}
+            <Link 
+              to="/register" 
+              style={{ color: '#667eea', textDecoration: 'none', fontWeight: '600' }}
+            >
+              Register here
+            </Link>
           </p>
         </div>
       </div>

@@ -16,14 +16,19 @@ function Dashboard() {
   });
 
   useEffect(() => {
+    // Redirect to login if not authenticated
+    if (!user || !token) {
+      navigate('/login');
+      return;
+    }
     fetchDashboardData();
-  }, []);
+  }, [user, token, navigate]);
 
   const fetchDashboardData = async () => {
     try {
       if (user.role === 'student') {
         // Fetch enrolled exams
-        const response = await fetch('http://localhost:5000/api/exams', {
+        const response = await fetch('http://localhost:5000/api/exams/', {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -67,11 +72,15 @@ function Dashboard() {
     return <div className="loading">Loading dashboard...</div>;
   }
 
+  if (!user) {
+    return <div className="loading">Redirecting to login...</div>;
+  }
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <h1>👋 Welcome, {user.name}!</h1>
-        <p>Role: <span className="badge">{user.role.toUpperCase()}</span></p>
+        <h1>👋 Welcome, {user?.name || 'User'}!</h1>
+        <p>Role: <span className="badge">{user?.role?.toUpperCase() || 'UNKNOWN'}</span></p>
       </div>
 
       <div className="stats-grid">
@@ -104,7 +113,7 @@ function Dashboard() {
             <h2>📝 Available Exams</h2>
             <button 
               className="btn btn-primary"
-              onClick={() => navigate('/exams')}
+              onClick={() => navigate('/exam-list')}
             >
               View All Exams
             </button>
@@ -143,7 +152,7 @@ function Dashboard() {
             <h2>📚 My Exams</h2>
             <button 
               className="btn btn-primary"
-              onClick={() => navigate('/examiner/dashboard')}
+              onClick={() => navigate('/examiner-dashboard')}
             >
               Manage Exams
             </button>
@@ -180,7 +189,7 @@ function Dashboard() {
             <>
               <button 
                 className="action-btn"
-                onClick={() => navigate('/exams')}
+                onClick={() => navigate('/exam-list')}
               >
                 <span className="action-icon">📝</span>
                 <span>Browse Exams</span>
@@ -198,14 +207,14 @@ function Dashboard() {
             <>
               <button 
                 className="action-btn"
-                onClick={() => navigate('/examiner/dashboard')}
+                onClick={() => navigate('/examiner-dashboard')}
               >
                 <span className="action-icon">🎓</span>
                 <span>Student Monitoring</span>
               </button>
               <button 
                 className="action-btn"
-                onClick={() => navigate('/examiner/dashboard')}
+                onClick={() => navigate('/examiner-dashboard')}
               >
                 <span className="action-icon">⚠️</span>
                 <span>Violations Report</span>

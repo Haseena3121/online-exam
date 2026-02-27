@@ -1,7 +1,8 @@
 """
 Seed database with test data
 """
-from app import create_app, db
+from app import create_app
+from database import db
 from models import User, Exam, ExamQuestion
 from datetime import datetime, timedelta
 
@@ -20,27 +21,21 @@ def seed_database():
         student1 = User(
             name='John Doe',
             email='student1@example.com',
-            phone='1234567890',
-            role='student',
-            is_active=True
+            role='student'
         )
         student1.set_password('Student@123')
         
         student2 = User(
             name='Jane Smith',
             email='student2@example.com',
-            phone='0987654321',
-            role='student',
-            is_active=True
+            role='student'
         )
         student2.set_password('Student@123')
         
         examiner = User(
             name='Prof. Adams',
             email='examiner@example.com',
-            phone='5555555555',
-            role='examiner',
-            is_active=True
+            role='examiner'
         )
         examiner.set_password('Examiner@123')
         
@@ -59,8 +54,7 @@ def seed_database():
             total_marks=100,
             passing_marks=40,
             negative_marking=0.25,
-            is_published=True,
-            is_active=True
+            is_published=True
         )
         
         db.session.add(exam)

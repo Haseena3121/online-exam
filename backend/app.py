@@ -18,10 +18,9 @@ def create_app():
     app = Flask(__name__)
 
     # ===============================
-    # DATABASE CONFIG
+    # DATABASE CONFIG (Using SQLite for easy setup)
     # ===============================
-    app.config['SQLALCHEMY_DATABASE_URI'] = \
-        'mysql+pymysql://root:1234@localhost/online_exam_proctoring'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///exam_proctoring.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # ===============================
@@ -33,14 +32,54 @@ def create_app():
     # ===============================
     # ENABLE CORS (VERY IMPORTANT)
     # ===============================
-    CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+            "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "Accept"],
+            "supports_credentials": True,
+            "expose_headers": ["Content-Type", "Authorization"]
+        }
+    })
+    
+    # Add OPTIONS handler for all routes
+    @app.after_request
+    def after_request(response):
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
 
     # ===============================
     # INIT EXTENSIONS
     # ===============================
     db.init_app(app)
     migrate.init_app(app, db)
-    JWTManager(app)
+    jwt = JWTManager(app)
+
+    # ===============================
+    # JWT ERROR HANDLERS
+    # ===============================
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error):
+        print(f"Invalid token error: {error}")
+        return jsonify({"error": "Invalid token", "message": str(error)}), 422
+
+    @jwt.unauthorized_loader
+    def unauthorized_callback(error):
+        print(f"Unauthorized error: {error}")
+        return jsonify({"error": "Missing authorization header", "message": str(error)}), 401
+
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        print(f"Expired token")
+        return jsonify({"error": "Token has expired"}), 401
+
+    @jwt.revoked_token_loader
+    def revoked_token_callback(jwt_header, jwt_payload):
+        print(f"Revoked token")
+        return jsonify({"error": "Token has been revoked"}), 401
 
     # ===============================
     # REGISTER ALL BLUEPRINTS

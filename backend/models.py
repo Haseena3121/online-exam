@@ -180,6 +180,7 @@ class ProctoringSession(db.Model):
     screen_locked = db.Column(db.Boolean, default=True)
 
     start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    end_time = db.Column(db.DateTime)
 
 
 # ============================

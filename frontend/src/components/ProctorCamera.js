@@ -6,9 +6,10 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
   const canvasRef = useRef(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [micActive, setMicActive] = useState(false);
-  const [isBlurred, setIsBlurred] = useState(true);
+  const [isBlurred, setIsBlurred] = useState(false); // Changed to false - no blur by default
   const [violations, setViolations] = useState({});
   const detectionInterval = useRef(null);
+  const violationCooldown = useRef({});
 
   useEffect(() => {
     initializeCamera();
@@ -51,41 +52,66 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
     // Check for face visibility
     checkFaceVisibility();
     
-    // Check for multiple persons
+    // Check for multiple persons (simulated)
     checkMultiplePersons();
     
-    // Check background blur
+    // Check background blur requirement
     checkBackgroundBlur();
+  };
+
+  const reportViolationWithCooldown = (type, severity, proof) => {
+    const now = Date.now();
+    const lastReport = violationCooldown.current[type] || 0;
     
-    // Check document visibility (tab switch)
-    checkTabSwitch();
+    // Only report same violation type once every 10 seconds
+    if (now - lastReport > 10000) {
+      violationCooldown.current[type] = now;
+      console.log(`🚨 Violation detected: ${type} (${severity})`);
+      onViolation?.(type, severity, proof);
+    }
   };
 
   const checkFaceVisibility = () => {
-    // Implement face detection logic
-    // Using getUserMedia video stream
     if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-      // Get canvas and draw video frame
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
         canvas.width = videoRef.current.videoWidth;
         canvas.height = videoRef.current.videoHeight;
         ctx.drawImage(videoRef.current, 0, 0);
+        
+        // Simple brightness check to detect if face is visible
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        let brightness = 0;
+        
+        for (let i = 0; i < data.length; i += 4) {
+          brightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+        }
+        
+        brightness = brightness / (data.length / 4);
+        
+        // If too dark, report violation
+        if (brightness < 30) {
+          reportViolationWithCooldown('face_not_visible', 'medium', null);
+        }
       }
     }
   };
 
   const checkMultiplePersons = () => {
-    // Implement person detection
+    // Randomly simulate detection (5% chance)
+    // In production, this would use actual AI detection
+    if (Math.random() < 0.05) {
+      reportViolationWithCooldown('multiple_persons', 'high', null);
+    }
   };
 
   const checkBackgroundBlur = () => {
-    // Implement background blur detection
-  };
-
-  const checkTabSwitch = () => {
-    // Detect tab visibility
+    // Check if blur is disabled when it should be on
+    if (!isBlurred) {
+      reportViolationWithCooldown('blur_disabled', 'low', null);
+    }
   };
 
   const stopCamera = () => {
@@ -95,9 +121,13 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
   };
 
   const toggleBlur = () => {
-    setIsBlurred(!isBlurred);
-    if (!isBlurred) {
-      onViolation?.('blur_disabled', 'high', null);
+    const newBlurState = !isBlurred;
+    setIsBlurred(newBlurState);
+    
+    // Report violation if blur is turned off
+    if (!newBlurState) {
+      console.log('🚨 Blur disabled - reporting violation');
+      onViolation?.('blur_disabled', 'medium', null);
     }
   };
 

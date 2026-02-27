@@ -18,7 +18,7 @@ from database import db
 from services.email_service import email_service
 from services.violation_detector import violation_detector
 
-proctoring_bp = Blueprint('proctoring', __name__, url_prefix='/api/proctoring')
+proctoring_bp = Blueprint('proctoring', __name__)
 logger = logging.getLogger(__name__)
 
 UPLOAD_FOLDER = 'uploads/evidence'
@@ -47,7 +47,7 @@ def save_evidence_file(file):
 def report_violation():
     """Report exam violation with evidence"""
     try:
-        student_id = get_jwt_identity()
+        student_id = int(get_jwt_identity())
         
         session = ProctoringSession.query.filter_by(
             student_id=student_id,
@@ -57,22 +57,10 @@ def report_violation():
         if not session:
             return jsonify({'error': 'No active session'}), 404
         
-        data = request.form.to_dict() or {}
+        data = request.form.to_dict() if request.form else request.get_json() or {}
         
         violation_type = data.get('violation_type')
         severity = data.get('severity', 'medium')
-        description = data.get('description', '')
-        
-        valid_violations = [
-            'phone_detected', 'tab_switch', 'eye_gaze_suspicious',
-            'multiple_persons', 'sound_detected', 'blur_exit_attempt',
-            'face_not_visible', 'extreme_head_movement',
-            'person_left_seat', 'other_person_detected',
-            'suspicious_movement', 'low_light_detected'
-        ]
-        
-        if violation_type not in valid_violations:
-            return jsonify({'error': 'Invalid violation type'}), 400
         
         # Get trust score reduction
         severity_map = {'low': 5, 'medium': 10, 'high': 20}
@@ -83,23 +71,9 @@ def report_violation():
             exam_id=session.exam_id,
             session_id=session.id,
             violation_type=violation_type,
-            severity=severity,
             trust_score_reduction=trust_score_reduction,
-            description=description,
-            timestamp=datetime.utcnow(),
-            is_notified=False
+            created_at=datetime.utcnow()
         )
-        
-        # Save evidence file
-        if 'evidence' in request.files:
-            file = request.files['evidence']
-            file_path = save_evidence_file(file)
-            
-            if file_path:
-                if file.filename.lower().endswith(('.mp4', '.avi', '.mov', '.webm')):
-                    violation.video_url = file_path
-                else:
-                    violation.screenshot_url = file_path
         
         # Update trust score
         session.current_trust_score -= trust_score_reduction
@@ -107,24 +81,6 @@ def report_violation():
             session.current_trust_score = 0
         
         db.session.add(violation)
-        db.session.commit()
-        
-        # Create examiner notification
-        exam = session.exam
-        notification = ExaminerNotification(
-            examiner_id=exam.examiner_id,
-            student_id=student_id,
-            exam_id=session.exam_id,
-            violation_id=violation.id,
-            message=f"⚠️ {violation_type.replace('_', ' ').title()} detected\nStudent: {student_id}\nTrust Score: {session.current_trust_score}%",
-            proof_type='video' if violation.video_url else ('screenshot' if violation.screenshot_url else 'alert'),
-            proof_url=violation.video_url or violation.screenshot_url,
-            severity_level=severity,
-            is_read=False
-        )
-        
-        violation.is_notified = True
-        db.session.add(notification)
         db.session.commit()
         
         logger.warning(f"Violation: {violation_type} for student {student_id}, Trust Score: {session.current_trust_score}%")
@@ -139,13 +95,16 @@ def report_violation():
         # Auto-submit if trust score < 50%
         if session.current_trust_score < 50:
             response_data['critical_message'] = 'Trust score below 50%. Exam will be auto-submitted!'
-            return auto_submit_exam(session)
+            session.status = 'ended'
+            db.session.commit()
         
         return jsonify(response_data), 201
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"Error reporting violation: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @proctoring_bp.route('/session/<int:session_id>', methods=['GET'])
@@ -261,7 +220,7 @@ def auto_submit_exam(session):
 def submit_exam():
     """Submit exam with answers"""
     try:
-        student_id = get_jwt_identity()
+        student_id = int(get_jwt_identity())
         data = request.get_json()
         
         session = ProctoringSession.query.filter_by(
@@ -270,11 +229,14 @@ def submit_exam():
         ).first()
         
         if not session:
-            return jsonify({'error': 'No active session'}), 404
+            return jsonify({'error': 'No active session found'}), 404
         
         answers = data.get('answers', [])
         
-        enrollment = EnrollmentQuery.get(session.enrollment_id)
+        # Get exam
+        exam = Exam.query.get(session.exam_id)
+        if not exam:
+            return jsonify({'error': 'Exam not found'}), 404
         
         total_marks = 0
         obtained_marks = 0
@@ -295,54 +257,40 @@ def submit_exam():
             
             if is_correct:
                 correct_count += 1
-            elif question.exam.negative_marking > 0:
-                marks_obtained -= question.exam.negative_marking
+            elif exam.negative_marking > 0:
+                marks_obtained -= exam.negative_marking
                 if marks_obtained < 0:
                     marks_obtained = 0
             
             obtained_marks += marks_obtained
             
             student_answer = StudentAnswer(
-                enrollment_id=enrollment.id,
+                student_id=student_id,
                 question_id=question_id,
                 selected_answer=selected_answer,
-                is_correct=is_correct,
-                marks_obtained=marks_obtained
+                marks_awarded=marks_obtained
             )
             
             db.session.add(student_answer)
         
         # Close session
         session.status = 'ended'
-        session.final_status = 'completed'
         session.end_time = datetime.utcnow()
         
-        enrollment.enrollment_status = 'submitted'
-        
         # Calculate result
-        exam = session.exam
         percentage = (obtained_marks / total_marks * 100) if total_marks > 0 else 0
-        status = 'pass' if obtained_marks >= exam.passing_marks else 'fail'
         
         violation_count = ViolationLog.query.filter_by(
             student_id=student_id,
             exam_id=session.exam_id
         ).count()
         
-        total_time_taken = int((session.end_time - session.start_time).total_seconds() / 60)
-        
         result = ExamResult(
-            enrollment_id=enrollment.id,
             student_id=student_id,
             exam_id=session.exam_id,
             obtained_marks=obtained_marks,
             total_marks=total_marks,
-            percentage=percentage,
-            status=status,
-            violation_count=violation_count,
-            final_trust_score=session.current_trust_score,
-            total_time_taken=total_time_taken,
-            submitted_at=datetime.utcnow()
+            percentage=percentage
         )
         
         db.session.add(result)
@@ -350,33 +298,24 @@ def submit_exam():
         
         logger.info(f"Exam submitted: student {student_id}, score {obtained_marks}/{total_marks}, {percentage:.2f}%")
         
-        # Send result email
-        user = User.query.get(student_id)
-        try:
-            email_service.send_exam_result_email(
-                user.email,
-                exam.title,
-                obtained_marks,
-                total_marks,
-                status
-            )
-        except:
-            pass
-        
         return jsonify({
             'message': 'Exam submitted successfully',
-            'result': result.to_dict(),
-            'summary': {
+            'result': {
+                'obtained_marks': obtained_marks,
+                'total_marks': total_marks,
+                'percentage': round(percentage, 2),
                 'correct_answers': correct_count,
                 'total_questions': len(answers),
-                'percentage': round(percentage, 2),
-                'status': status
+                'violation_count': violation_count,
+                'final_trust_score': session.current_trust_score
             }
         }), 200
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"Error submitting exam: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @proctoring_bp.route('/analytics/<int:session_id>', methods=['GET'])

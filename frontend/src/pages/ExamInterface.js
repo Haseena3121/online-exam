@@ -15,12 +15,13 @@ function ExamInterface() {
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(null); // Changed from 0 to null
   const [sessionStatus, setSessionStatus] = useState('active');
   const [trustScore, setTrustScore] = useState(100);
   const [showWarning, setShowWarning] = useState(false);
   const [violationMessage, setViolationMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [examStarted, setExamStarted] = useState(false); // New flag
   const cameraRef = useRef(null);
   const timerIntervalRef = useRef(null);
 
@@ -29,13 +30,15 @@ function ExamInterface() {
   }, [examId]);
 
   useEffect(() => {
-    if (exam) {
+    if (exam && exam.duration) {
       setTimeLeft(exam.duration * 60); // Convert to seconds
+      setExamStarted(true);
     }
   }, [exam]);
 
   useEffect(() => {
-    if (sessionStatus === 'active' && timeLeft > 0) {
+    // Only start timer if exam has started and time is set
+    if (sessionStatus === 'active' && timeLeft !== null && timeLeft > 0 && examStarted) {
       timerIntervalRef.current = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
@@ -45,7 +48,7 @@ function ExamInterface() {
           return prev - 1;
         });
       }, 1000);
-    } else if (timeLeft === 0 && sessionStatus === 'active') {
+    } else if (timeLeft === 0 && sessionStatus === 'active' && examStarted) {
       handleSubmitExam();
     }
 
@@ -54,7 +57,7 @@ function ExamInterface() {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [timeLeft, sessionStatus]);
+  }, [timeLeft, sessionStatus, examStarted]);
 
   // Prevent tab switching
   useEffect(() => {
@@ -93,6 +96,7 @@ function ExamInterface() {
 
   const fetchExamDetails = async () => {
     try {
+      console.log('Fetching exam details for exam ID:', examId);
       const response = await fetch(`http://localhost:5000/api/exams/${examId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -101,11 +105,22 @@ function ExamInterface() {
       
       if (response.ok) {
         const data = await response.json();
-        setExam(data.exam);
-        setQuestions(data.exam.questions || []);
+        console.log('Exam data received:', data);
+        setExam(data);
+        setQuestions(data.questions || []);
+        
+        if (!data.questions || data.questions.length === 0) {
+          alert('This exam has no questions. Please contact the examiner.');
+        }
+      } else {
+        console.error('Failed to fetch exam:', response.status);
+        alert('Failed to load exam. Please try again.');
+        navigate('/exam-list');
       }
     } catch (error) {
       console.error('Error fetching exam:', error);
+      alert('Error loading exam. Please check your connection.');
+      navigate('/exam-list');
     } finally {
       setLoading(false);
     }
@@ -136,6 +151,8 @@ function ExamInterface() {
 
   const reportViolation = async (violationType, severity, proof) => {
     try {
+      console.log(`📊 Reporting violation: ${violationType} (${severity})`);
+      
       const formData = new FormData();
       formData.append('violation_type', violationType);
       formData.append('severity', severity);
@@ -155,6 +172,7 @@ function ExamInterface() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log(`✅ Violation reported. New trust score: ${data.current_trust_score}%`);
         setTrustScore(data.current_trust_score);
         
         if (data.warning) {
@@ -167,9 +185,12 @@ function ExamInterface() {
           alert('🔴 ' + data.critical_message);
           handleSubmitExam();
         }
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Failed to report violation:', response.status, errorData);
       }
     } catch (error) {
-      console.error('Error reporting violation:', error);
+      console.error('❌ Error reporting violation:', error);
     }
   };
 

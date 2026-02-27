@@ -1,10 +1,8 @@
 import * as tf from '@tensorflow/tfjs';
-import * as facemesh from '@tensorflow-models/facemesh';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 
 class ProctoringService {
   constructor() {
-    this.facemeshModel = null;
     this.cocoModel = null;
     this.violations = [];
   }
@@ -12,10 +10,6 @@ class ProctoringService {
   // Load models
   async loadModels() {
     try {
-      console.log('Loading Facemesh model...');
-      this.facemeshModel = await facemesh.load();
-      console.log('Facemesh model loaded');
-
       console.log('Loading COCO-SSD model...');
       this.cocoModel = await cocoSsd.load();
       console.log('COCO-SSD model loaded');
@@ -27,7 +21,26 @@ class ProctoringService {
     }
   }
 
-  // Detect face visibility
+  // Detect face visibility (simplified version)
+  async detectFace(videoElement) {
+    if (!this.cocoModel) {
+      console.warn('Models not loaded yet');
+      return { faceDetected: false, confidence: 0 };
+    }
+
+    try {
+      const predictions = await this.cocoModel.detect(videoElement);
+      const person = predictions.find(p => p.class === 'person' && p.score > 0.5);
+      
+      return {
+        faceDetected: !!person,
+        confidence: person ? person.score : 0
+      };
+    } catch (error) {
+      console.error('Face detection error:', error);
+      return { faceDetected: false, confidence: 0 };
+    }
+  }
   async detectFaces(videoElement) {
     if (!this.facemeshModel || !videoElement) return false;
 
