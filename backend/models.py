@@ -58,6 +58,10 @@ class Exam(db.Model):
     is_published = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
 
+    # Auto-deletion settings
+    auto_delete_enabled = db.Column(db.Boolean, default=False)  # False = Forever, True = Custom date
+    auto_delete_date = db.Column(db.DateTime, nullable=True)  # Date when exam should be deleted
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     questions = db.relationship('ExamQuestion', backref='exam', lazy=True)
@@ -155,6 +159,9 @@ class ExamResult(db.Model):
     obtained_marks = db.Column(db.Float)
     total_marks = db.Column(db.Float)
     percentage = db.Column(db.Float)
+    final_trust_score = db.Column(db.Integer, default=100)
+    status = db.Column(db.String(50), default='completed')
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -192,7 +199,10 @@ class ExaminerNotification(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     examiner_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'))
     message = db.Column(db.Text)
+    severity_level = db.Column(db.String(20), default='medium')
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -211,6 +221,9 @@ class ViolationLog(db.Model):
     session_id = db.Column(db.Integer, db.ForeignKey('proctoring_sessions.id'))
 
     violation_type = db.Column(db.String(100))
+    severity = db.Column(db.String(20), default='medium')
+    description = db.Column(db.Text)
+    evidence_path = db.Column(db.String(255))
     trust_score_reduction = db.Column(db.Integer, default=10)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # ============================

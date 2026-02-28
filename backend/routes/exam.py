@@ -8,6 +8,29 @@ exam_bp = Blueprint('exam', __name__)
 
 
 # ===============================
+# AUTH TEST ENDPOINT
+# ===============================
+@exam_bp.route('/auth-test', methods=['GET'])
+@jwt_required()
+def auth_test():
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        
+        return jsonify({
+            "message": "Authentication successful",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "role": user.role
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===============================
 # TEST ENDPOINT (NO AUTH)
 # ===============================
 @exam_bp.route('/test', methods=['POST'])
@@ -189,31 +212,27 @@ def start_exam(exam_id):
                 "proctoring_session_id": existing_session.id
             }), 200
 
-        # Create a new proctoring session
-        try:
-            session = ProctoringSession(
-                student_id=student_id,
-                exam_id=exam_id,
-                current_trust_score=100,
-                status='active',
-                camera_active=True,
-                mic_active=True,
-                screen_locked=True,
-                start_time=datetime.utcnow()
-            )
-            
-            db.session.add(session)
-            db.session.commit()
-            
-            proctoring_session_id = session.id
-        except Exception as session_error:
-            # If session creation fails, continue without it
-            print(f"Warning: Could not create proctoring session: {session_error}")
-            proctoring_session_id = None
+        # Create a new proctoring session - MUST SUCCEED
+        session = ProctoringSession(
+            student_id=student_id,
+            exam_id=exam_id,
+            current_trust_score=100,
+            status='active',
+            camera_active=True,
+            mic_active=True,
+            screen_locked=True,
+            start_time=datetime.utcnow()
+        )
+        
+        db.session.add(session)
+        db.session.commit()
+        
+        proctoring_session_id = session.id
+        print(f"✅ Proctoring session created successfully: ID {proctoring_session_id}")
 
         # Create a simple session ID
         import time
-        session_id = f"{student_id}_{exam_id}_{int(time.time())}"
+        session_id = f"{student_id}_{exam_id}_{proctoring_session_id}"
 
         return jsonify({
             "message": "Exam started successfully",
@@ -408,3 +427,90 @@ def create_exam():
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Failed to create exam: {str(e)}"}), 500
+
+
+@exam_bp.route('/<int:exam_id>/results', methods=['GET'])
+@jwt_required()
+def get_exam_results(exam_id):
+    """Get all results for an exam (examiner only)"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        
+        if not user or user.role != 'examiner':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        exam = Exam.query.get(exam_id)
+        if not exam:
+            return jsonify({'error': 'Exam not found'}), 404
+        
+        # Verify examiner owns this exam
+        if exam.examiner_id != user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Get all results for this exam
+        from models import ExamResult, ViolationLog, ProctoringSession
+        results = ExamResult.query.filter_by(exam_id=exam_id).all()
+        
+        results_data = []
+        for result in results:
+            student = User.query.get(result.student_id)
+            
+            # Get violations for this student with evidence
+            violations = ViolationLog.query.filter_by(
+                exam_id=exam_id,
+                student_id=result.student_id
+            ).order_by(ViolationLog.created_at.desc()).all()
+            
+            # Get proctoring session
+            session = ProctoringSession.query.filter_by(
+                exam_id=exam_id,
+                student_id=result.student_id
+            ).first()
+            
+            results_data.append({
+                'result_id': result.id,
+                'student': {
+                    'id': student.id,
+                    'name': student.name,
+                    'email': student.email
+                },
+                'marks': {
+                    'obtained': result.obtained_marks,
+                    'total': result.total_marks,
+                    'percentage': round(result.percentage, 2) if result.percentage else 0
+                },
+                'trust_score': result.final_trust_score if result.final_trust_score else (session.current_trust_score if session else 100),
+                'status': result.status if result.status else 'completed',
+                'violation_count': len(violations),
+                'violations': [{
+                    'id': v.id,
+                    'type': v.violation_type,
+                    'severity': v.severity if hasattr(v, 'severity') and v.severity else 'medium',
+                    'description': v.description if hasattr(v, 'description') and v.description else None,
+                    'reduction': v.trust_score_reduction,
+                    'evidence_path': v.evidence_path if hasattr(v, 'evidence_path') and v.evidence_path else None,
+                    'evidence_url': f'http://localhost:5000/api/proctoring/evidence/{v.evidence_path.split("/")[-1]}' if hasattr(v, 'evidence_path') and v.evidence_path else None,
+                    'time': v.created_at.isoformat() + 'Z' if v.created_at else None  # Add 'Z' to indicate UTC
+                } for v in violations],
+                'submitted_at': result.submitted_at.isoformat() + 'Z' if result.submitted_at else None  # Add 'Z' to indicate UTC
+            })
+        
+        return jsonify({
+            'exam': {
+                'id': exam.id,
+                'title': exam.title,
+                'total_marks': exam.total_marks,
+                'duration': exam.duration
+            },
+            'results': results_data,
+            'total_students': len(results_data)
+        }), 200
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error getting exam results: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

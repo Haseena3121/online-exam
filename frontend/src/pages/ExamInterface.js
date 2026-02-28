@@ -94,6 +94,43 @@ function ExamInterface() {
     };
   }, []);
 
+  // Detect copy/paste/cut
+  useEffect(() => {
+    const handleCopy = (e) => {
+      e.preventDefault();
+      reportViolation('copy_attempt', 'high', null);
+      setShowWarning(true);
+      setViolationMessage('⚠️ COPYING IS NOT ALLOWED! This violation has been recorded.');
+      setTimeout(() => setShowWarning(false), 5000);
+    };
+
+    const handlePaste = (e) => {
+      e.preventDefault();
+      reportViolation('paste_attempt', 'high', null);
+      setShowWarning(true);
+      setViolationMessage('⚠️ PASTING IS NOT ALLOWED! This violation has been recorded.');
+      setTimeout(() => setShowWarning(false), 5000);
+    };
+
+    const handleCut = (e) => {
+      e.preventDefault();
+      reportViolation('cut_attempt', 'medium', null);
+      setShowWarning(true);
+      setViolationMessage('⚠️ CUTTING TEXT IS NOT ALLOWED! This violation has been recorded.');
+      setTimeout(() => setShowWarning(false), 5000);
+    };
+
+    document.addEventListener('copy', handleCopy);
+    document.addEventListener('paste', handlePaste);
+    document.addEventListener('cut', handleCut);
+
+    return () => {
+      document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('paste', handlePaste);
+      document.removeEventListener('cut', handleCut);
+    };
+  }, [sessionStatus]);
+
   const fetchExamDetails = async () => {
     try {
       console.log('Fetching exam details for exam ID:', examId);
@@ -150,6 +187,12 @@ function ExamInterface() {
   };
 
   const reportViolation = async (violationType, severity, proof) => {
+    // Don't report violations if session is not active
+    if (sessionStatus !== 'active') {
+      console.log(`⏸️ Skipping violation report - session status: ${sessionStatus}`);
+      return;
+    }
+
     try {
       console.log(`📊 Reporting violation: ${violationType} (${severity})`);
       
@@ -177,17 +220,32 @@ function ExamInterface() {
         
         if (data.warning) {
           setShowWarning(true);
-          setViolationMessage('⚠️ WARNING: Your trust score is low. Continue following rules!');
+          setViolationMessage(`⚠️ WARNING: Trust Score ${data.current_trust_score}% - Continue following rules!`);
           setTimeout(() => setShowWarning(false), 5000);
         }
         
         if (data.critical_message) {
+          // Auto-submit triggered
+          setSessionStatus('submitting');
+          if (cameraRef.current?.stopProctoring) {
+            cameraRef.current.stopProctoring();
+          }
+          
+          // Show alert
           alert('🔴 ' + data.critical_message);
-          handleSubmitExam();
+          
+          // Auto-submit the exam immediately
+          autoSubmitExam();
         }
       } else {
         const errorData = await response.json();
         console.error('❌ Failed to report violation:', response.status, errorData);
+        
+        // If session ended, stop trying to report violations
+        if (errorData.error === 'No active session') {
+          console.log('⏸️ Session ended - stopping violation reports');
+          setSessionStatus('ended');
+        }
       }
     } catch (error) {
       console.error('❌ Error reporting violation:', error);
@@ -197,6 +255,11 @@ function ExamInterface() {
   const handleSubmitExam = async () => {
     try {
       setSessionStatus('submitting');
+      
+      // Stop proctoring detection
+      if (cameraRef.current?.stopProctoring) {
+        cameraRef.current.stopProctoring();
+      }
 
       const submissionData = {
         answers: questions.map(q => ({
@@ -218,10 +281,63 @@ function ExamInterface() {
         const data = await response.json();
         navigate(`/result/${examId}`, { state: { result: data.result } });
       } else {
-        alert('Error submitting exam');
+        const errorData = await response.json();
+        console.error('Submit error:', errorData);
+        alert('Error submitting exam: ' + (errorData.error || 'Unknown error'));
+        setSessionStatus('active'); // Allow retry
       }
     } catch (error) {
       console.error('Error submitting exam:', error);
+      alert('Error submitting exam. Please try again.');
+      setSessionStatus('active'); // Allow retry
+    }
+  };
+
+  const autoSubmitExam = async () => {
+    try {
+      setSessionStatus('submitting');
+      
+      // Stop proctoring detection
+      if (cameraRef.current?.stopProctoring) {
+        cameraRef.current.stopProctoring();
+      }
+
+      // Auto-submit with current answers
+      const submissionData = {
+        answers: questions.map(q => ({
+          question_id: q.id,
+          selected_answer: answers[q.id] || ''
+        })),
+        auto_submitted: true
+      };
+
+      const response = await fetch('http://localhost:5000/api/proctoring/submit', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(submissionData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Navigate to results immediately
+        navigate(`/result/${examId}`, { 
+          state: { 
+            result: data.result,
+            autoSubmitted: true,
+            reason: 'Trust score fell below 50%'
+          } 
+        });
+      } else {
+        console.error('Auto-submit failed');
+        // Try to navigate anyway
+        navigate(`/result/${examId}`);
+      }
+    } catch (error) {
+      console.error('Error auto-submitting:', error);
+      navigate(`/result/${examId}`);
     }
   };
 

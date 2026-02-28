@@ -13,6 +13,8 @@ import AcceptanceForm from "./pages/AcceptanceForm";
 import ViolationDetails from "./pages/ViolationDetails";
 import CreateExam from "./pages/CreateExam";
 import CameraTest from "./pages/CameraTest";
+import LiveMonitoring from "./pages/LiveMonitoring";
+import ExamResults from "./pages/ExamResults";
 import Navbar from "./components/Navbar";
 
 function App() {
@@ -37,6 +39,8 @@ function App() {
 
           {/* Examiner Routes */}
           <Route path="/examiner-dashboard" element={<ExaminarDashboard />} />
+          <Route path="/live-monitoring" element={<LiveMonitoring />} />
+          <Route path="/exam/:examId/results" element={<ExamResults />} />
           <Route path="/violation-details" element={<ViolationDetails />} />
           <Route path="/create-exam" element={<CreateExam />} />
         </Routes>

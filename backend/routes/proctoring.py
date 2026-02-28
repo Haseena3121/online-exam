@@ -57,10 +57,16 @@ def report_violation():
         if not session:
             return jsonify({'error': 'No active session'}), 404
         
-        data = request.form.to_dict() if request.form else request.get_json() or {}
+        # Get form data
+        violation_type = request.form.get('violation_type')
+        severity = request.form.get('severity', 'medium')
         
-        violation_type = data.get('violation_type')
-        severity = data.get('severity', 'medium')
+        # Handle evidence file upload
+        evidence_path = None
+        if 'evidence' in request.files:
+            evidence_file = request.files['evidence']
+            if evidence_file and allowed_file(evidence_file.filename):
+                evidence_path = save_evidence_file(evidence_file)
         
         # Get trust score reduction
         severity_map = {'low': 5, 'medium': 10, 'high': 20}
@@ -74,6 +80,11 @@ def report_violation():
             trust_score_reduction=trust_score_reduction,
             created_at=datetime.utcnow()
         )
+        
+        # Add evidence path if available
+        if evidence_path:
+            # Store relative path
+            violation.evidence_path = evidence_path
         
         # Update trust score
         session.current_trust_score -= trust_score_reduction
@@ -89,7 +100,8 @@ def report_violation():
             'message': 'Violation recorded',
             'violation_id': violation.id,
             'current_trust_score': session.current_trust_score,
-            'warning': session.current_trust_score < 50
+            'warning': session.current_trust_score < 80,
+            'evidence_saved': evidence_path is not None
         }
         
         # Auto-submit if trust score < 50%
@@ -381,4 +393,156 @@ def update_analytics(session_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@proctoring_bp.route('/monitor/active-sessions', methods=['GET'])
+@jwt_required()
+def get_active_sessions():
+    """Get all active proctoring sessions for examiner monitoring"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        
+        if not user or user.role != 'examiner':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Get all active sessions for this examiner's exams
+        active_sessions = db.session.query(
+            ProctoringSession, User, Exam
+        ).join(
+            User, ProctoringSession.student_id == User.id
+        ).join(
+            Exam, ProctoringSession.exam_id == Exam.id
+        ).filter(
+            Exam.examiner_id == user_id,
+            ProctoringSession.status == 'active'
+        ).all()
+        
+        sessions_data = []
+        for session, student, exam in active_sessions:
+            # Get recent violations for this session
+            recent_violations = ViolationLog.query.filter_by(
+                session_id=session.id
+            ).order_by(ViolationLog.created_at.desc()).limit(5).all()
+            
+            sessions_data.append({
+                'session_id': session.id,
+                'student': {
+                    'id': student.id,
+                    'name': student.name,
+                    'email': student.email
+                },
+                'exam': {
+                    'id': exam.id,
+                    'title': exam.title,
+                    'duration': exam.duration
+                },
+                'trust_score': session.current_trust_score,
+                'start_time': session.start_time.isoformat() if session.start_time else None,
+                'camera_active': session.camera_active,
+                'mic_active': session.mic_active,
+                'violations': [{
+                    'id': v.id,
+                    'type': v.violation_type,
+                    'reduction': v.trust_score_reduction,
+                    'time': v.created_at.isoformat() if v.created_at else None
+                } for v in recent_violations]
+            })
+        
+        return jsonify({
+            'active_sessions': sessions_data,
+            'count': len(sessions_data)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting active sessions: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@proctoring_bp.route('/monitor/session/<int:session_id>/details', methods=['GET'])
+@jwt_required()
+def get_session_details(session_id):
+    """Get detailed information about a specific session"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        
+        if not user or user.role != 'examiner':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        session = ProctoringSession.query.get(session_id)
+        if not session:
+            return jsonify({'error': 'Session not found'}), 404
+        
+        # Verify this session belongs to examiner's exam
+        exam = Exam.query.get(session.exam_id)
+        if exam.examiner_id != user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        student = User.query.get(session.student_id)
+        
+        # Get all violations
+        violations = ViolationLog.query.filter_by(
+            session_id=session_id
+        ).order_by(ViolationLog.created_at.desc()).all()
+        
+        return jsonify({
+            'session': {
+                'id': session.id,
+                'status': session.status,
+                'trust_score': session.current_trust_score,
+                'start_time': session.start_time.isoformat() if session.start_time else None,
+                'end_time': session.end_time.isoformat() if session.end_time else None,
+                'camera_active': session.camera_active,
+                'mic_active': session.mic_active
+            },
+            'student': {
+                'id': student.id,
+                'name': student.name,
+                'email': student.email
+            },
+            'exam': {
+                'id': exam.id,
+                'title': exam.title,
+                'duration': exam.duration,
+                'total_marks': exam.total_marks
+            },
+            'violations': [{
+                'id': v.id,
+                'type': v.violation_type,
+                'reduction': v.trust_score_reduction,
+                'time': v.created_at.isoformat() if v.created_at else None
+            } for v in violations],
+            'violation_count': len(violations)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting session details: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@proctoring_bp.route('/evidence/<path:filename>', methods=['GET'])
+@jwt_required()
+def serve_evidence(filename):
+    """Serve evidence files (screenshots)"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        
+        # Only examiners can view evidence
+        if not user or user.role != 'examiner':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        evidence_path = os.path.join(UPLOAD_FOLDER, filename)
+        
+        if not os.path.exists(evidence_path):
+            return jsonify({'error': 'Evidence not found'}), 404
+        
+        from flask import send_file
+        return send_file(evidence_path, mimetype='image/jpeg')
+        
+    except Exception as e:
+        logger.error(f"Error serving evidence: {str(e)}")
         return jsonify({'error': str(e)}), 500

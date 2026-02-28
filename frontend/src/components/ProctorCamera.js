@@ -48,6 +48,19 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
     }, 2000); // Check every 2 seconds
   };
 
+  const stopProctoring = () => {
+    if (detectionInterval.current) {
+      clearInterval(detectionInterval.current);
+      detectionInterval.current = null;
+      console.log('⏸️ Proctoring detection stopped');
+    }
+  };
+
+  // Expose stopProctoring to parent component
+  React.useImperativeHandle(ref, () => ({
+    stopProctoring
+  }));
+
   const performDetections = () => {
     // Check for face visibility
     checkFaceVisibility();
@@ -67,15 +80,42 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
     if (now - lastReport > 10000) {
       violationCooldown.current[type] = now;
       console.log(`🚨 Violation detected: ${type} (${severity})`);
-      onViolation?.(type, severity, proof);
+      
+      // Capture screenshot as evidence
+      captureScreenshot().then(screenshot => {
+        onViolation?.(type, severity, screenshot);
+      });
     }
+  };
+
+  const captureScreenshot = async () => {
+    try {
+      if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(videoRef.current, 0, 0);
+        
+        // Convert to blob
+        return new Promise((resolve) => {
+          canvas.toBlob((blob) => {
+            resolve(blob);
+          }, 'image/jpeg', 0.8);
+        });
+      }
+    } catch (error) {
+      console.error('Error capturing screenshot:', error);
+    }
+    return null;
   };
 
   const checkFaceVisibility = () => {
     if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
       const canvas = canvasRef.current;
       if (canvas) {
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         canvas.width = videoRef.current.videoWidth;
         canvas.height = videoRef.current.videoHeight;
         ctx.drawImage(videoRef.current, 0, 0);

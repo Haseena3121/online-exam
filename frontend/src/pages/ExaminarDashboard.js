@@ -4,23 +4,63 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/Dashboard.css';
 
 function ExaminerDashboard() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
 
   const [exams, setExams] = useState([]);
   const [selectedExam, setSelectedExam] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Check if user is examiner on component mount
   useEffect(() => {
+    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const currentToken = localStorage.getItem("access_token");
+    
+    console.log('ExaminerDashboard - Current user:', currentUser);
+    console.log('ExaminerDashboard - Has token:', !!currentToken);
+    
+    if (!currentToken || !currentUser.id) {
+      console.log('No authentication, redirecting to login');
+      navigate('/login');
+      return;
+    }
+    
+    if (currentUser.role !== 'examiner') {
+      console.log('User is not examiner, role:', currentUser.role);
+      alert('Access denied. You must be logged in as an examiner.');
+      navigate('/login');
+      return;
+    }
+    
     fetchExams();
-  }, []);
+  }, [navigate]);
 
   const fetchExams = async () => {
     try {
       console.log('Fetching exams...');
+      const token = localStorage.getItem("access_token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      
+      console.log('Current user:', user);
+      console.log('Token exists:', !!token);
+      
+      if (!token) {
+        console.error('No token found, redirecting to login');
+        navigate('/login');
+        return;
+      }
+      
+      if (user.role !== 'examiner') {
+        console.error('User is not an examiner:', user.role);
+        alert('You must be logged in as an examiner to access this page');
+        navigate('/login');
+        return;
+      }
+
       const response = await fetch('http://localhost:5000/api/exams/my-exams', {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
 
@@ -31,8 +71,16 @@ function ExaminerDashboard() {
         console.log('Exams data:', data);
         console.log('Exams array:', data.exams);
         setExams(data.exams);
+      } else if (response.status === 403) {
+        console.error('403 Forbidden - Token invalid or user not examiner');
+        alert('Authentication failed. Please login again as an examiner.');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        navigate('/login');
       } else {
         console.error('Failed to fetch exams:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error details:', errorData);
       }
     } catch (error) {
       console.error('Error fetching exams:', error);
@@ -70,13 +118,20 @@ function ExaminerDashboard() {
     <div className="examiner-dashboard">
       <h1>👨‍🏫 Examiner Dashboard</h1>
 
-      {/* 🔥 CREATE EXAM BUTTON */}
-      <div style={{ marginBottom: "20px" }}>
+      {/* Action Buttons */}
+      <div style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
         <button
           onClick={() => navigate("/create-exam")}
           className="btn btn-primary"
         >
           ➕ Create New Exam
+        </button>
+        <button
+          onClick={() => navigate("/live-monitoring")}
+          className="btn btn-success"
+          style={{ background: "#4caf50" }}
+        >
+          🎥 Live Monitoring
         </button>
       </div>
 
@@ -115,6 +170,7 @@ function ExaminerDashboard() {
                     }}
                     style={{
                       marginTop: '10px',
+                      marginRight: '10px',
                       padding: '8px 16px',
                       backgroundColor: exam.is_published ? '#ff9800' : '#4caf50',
                       color: 'white',
@@ -124,6 +180,23 @@ function ExaminerDashboard() {
                     }}
                   >
                     {exam.is_published ? 'Unpublish' : 'Publish'}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/exam/${exam.id}/results`);
+                    }}
+                    style={{
+                      marginTop: '10px',
+                      padding: '8px 16px',
+                      backgroundColor: '#667eea',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📊 View Results
                   </button>
                 </div>
               ))

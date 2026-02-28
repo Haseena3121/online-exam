@@ -1,19 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import '../styles/Dashboard.css';
 
 function Results() {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { examId } = useParams();
   const [results, setResults] = useState([]);
+  const [currentResult, setCurrentResult] = useState(null);
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Check if this is from auto-submit
+  const autoSubmitted = location.state?.autoSubmitted;
+  const autoSubmitReason = location.state?.reason;
+  const resultData = location.state?.result;
+
   useEffect(() => {
-    fetchResults();
-  }, []);
+    if (examId && resultData) {
+      // Show specific result from auto-submit
+      setCurrentResult(resultData);
+      setLoading(false);
+    } else {
+      fetchResults();
+    }
+  }, [examId, resultData]);
 
   const fetchResults = async () => {
     try {
@@ -50,6 +64,90 @@ function Results() {
   };
 
   if (loading) return <div className="loading">Loading results...</div>;
+
+  // Show single result if from auto-submit
+  if (currentResult) {
+    return (
+      <div className="results-container">
+        {autoSubmitted && (
+          <div className="alert alert-warning" style={{ 
+            background: '#fff3cd', 
+            border: '2px solid #ffc107', 
+            padding: '20px', 
+            borderRadius: '10px',
+            marginBottom: '20px'
+          }}>
+            <h2 style={{ color: '#856404', margin: '0 0 10px 0' }}>
+              ⚠️ Exam Auto-Submitted
+            </h2>
+            <p style={{ margin: 0, fontSize: '16px' }}>
+              {autoSubmitReason || 'Your exam was automatically submitted due to rule violations.'}
+            </p>
+          </div>
+        )}
+
+        <h1>📊 Exam Result</h1>
+
+        <div className="result-card" style={{
+          background: 'white',
+          padding: '30px',
+          borderRadius: '10px',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          marginBottom: '20px'
+        }}>
+          <div className="result-header" style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '48px', margin: '10px 0', color: currentResult.percentage >= 50 ? '#4caf50' : '#f44336' }}>
+              {currentResult.percentage?.toFixed(2) || '0.00'}%
+            </h2>
+            <p style={{ fontSize: '24px', color: '#666' }}>
+              {currentResult.obtained_marks} / {currentResult.total_marks} marks
+            </p>
+          </div>
+
+          <div className="result-details" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div className="detail-item">
+              <strong>Correct Answers:</strong>
+              <span style={{ color: '#4caf50', fontSize: '20px', marginLeft: '10px' }}>
+                ✓ {currentResult.correct_answers || 0}
+              </span>
+            </div>
+            <div className="detail-item">
+              <strong>Total Questions:</strong>
+              <span style={{ fontSize: '20px', marginLeft: '10px' }}>
+                {currentResult.total_questions || 0}
+              </span>
+            </div>
+            <div className="detail-item">
+              <strong>Violations:</strong>
+              <span style={{ color: '#f44336', fontSize: '20px', marginLeft: '10px' }}>
+                🚨 {currentResult.violation_count || 0}
+              </span>
+            </div>
+            <div className="detail-item">
+              <strong>Final Trust Score:</strong>
+              <span style={{ 
+                color: currentResult.final_trust_score >= 50 ? '#4caf50' : '#f44336',
+                fontSize: '20px',
+                marginLeft: '10px'
+              }}>
+                {currentResult.final_trust_score || 0}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: '30px' }}>
+          <button 
+            className="btn btn-primary"
+            onClick={() => navigate('/exam-list')}
+            style={{ padding: '15px 30px', fontSize: '16px' }}
+          >
+            Back to Exam List
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="results-container">
@@ -110,7 +208,7 @@ function Results() {
                     {result.final_trust_score}%
                   </td>
                   <td>{result.total_time_taken ? result.total_time_taken + ' min' : '-'}</td>
-                  <td>{new Date(result.submitted_at).toLocaleDateString()}</td>
+                  <td>{result.submitted_at ? new Date(result.submitted_at).toLocaleDateString() : 'N/A'}</td>
                   <td>
                     <button 
                       className="btn btn-small"
