@@ -169,7 +169,6 @@ def auto_check_exam_time():
                 if time_elapsed >= exam.duration:
                     # Auto-submit exam
                     session.status = 'ended'
-                    session.final_status = 'completed'
                     session.end_time = datetime.utcnow()
                     # Create result
                     # Notify student

@@ -104,11 +104,30 @@ def report_violation():
             'evidence_saved': evidence_path is not None
         }
         
-        # Auto-submit if trust score < 50%
-        if session.current_trust_score < 50:
-            response_data['critical_message'] = 'Trust score below 50%. Exam will be auto-submitted!'
-            session.status = 'ended'
-            db.session.commit()
+        # Auto-submit if trust score < 50% AND session is still active
+        # Check if already auto-submitted to prevent duplicate submissions
+        if session.current_trust_score < 50 and session.status == 'active':
+            # Check if result already exists
+            existing_result = ExamResult.query.filter_by(
+                student_id=session.student_id,
+                exam_id=session.exam_id
+            ).first()
+            
+            if not existing_result:
+                response_data['critical_message'] = 'Trust score below 50%. Exam will be auto-submitted!'
+                # Call auto_submit_exam to create the result
+                try:
+                    auto_submit_result = auto_submit_exam(session)
+                    response_data['auto_submitted'] = True
+                    if auto_submit_result:
+                        response_data['result'] = auto_submit_result
+                except Exception as auto_submit_error:
+                    logger.error(f"Auto-submit failed: {str(auto_submit_error)}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                response_data['critical_message'] = 'Exam already submitted.'
+                response_data['auto_submitted'] = True
         
         return jsonify(response_data), 201
         
@@ -161,71 +180,163 @@ def send_warning(session_id):
 def auto_submit_exam(session):
     """Auto-submit exam when trust score < 50%"""
     try:
+        logger.info(f"Starting auto-submit for student {session.student_id}, exam {session.exam_id}")
+        
+        # Check if result already exists to prevent duplicates
+        existing_result = ExamResult.query.filter_by(
+            student_id=session.student_id,
+            exam_id=session.exam_id
+        ).first()
+        
+        if existing_result:
+            logger.warning(f"Result already exists for student {session.student_id}, exam {session.exam_id}. Skipping auto-submit.")
+            return {
+                'obtained_marks': existing_result.obtained_marks,
+                'total_marks': existing_result.total_marks,
+                'percentage': existing_result.percentage,
+                'correct_answers': existing_result.correct_answers,
+                'violation_count': existing_result.violation_count,
+                'final_trust_score': existing_result.final_trust_score
+            }
+        
         session.status = 'ended'
-        session.final_status = 'auto_submitted'
         session.end_time = datetime.utcnow()
         
-        enrollment = session.enrollment_ref
-        enrollment.enrollment_status = 'submitted'
+        # Get enrollment using enrollment_id
+        enrollment = None
+        if session.enrollment_id:
+            enrollment = ExamEnrollment.query.get(session.enrollment_id)
+            if enrollment:
+                enrollment.enrollment_status = 'submitted'
         
-        exam = session.exam
+        # Get exam directly by ID
+        exam = Exam.query.get(session.exam_id)
+        if not exam:
+            logger.error(f"Exam {session.exam_id} not found for auto-submit")
+            return None
+        
+        # Calculate marks based on answers already submitted
+        obtained_marks = 0
+        correct_count = 0
+        answered_count = 0
+        
+        # Get all answers submitted by the student for this exam
+        student_answers = StudentAnswer.query.filter_by(
+            student_id=session.student_id
+        ).join(ExamQuestion).filter(
+            ExamQuestion.exam_id == session.exam_id
+        ).all()
+        
+        logger.info(f"Found {len(student_answers)} answers for student {session.student_id}")
+        
+        # Calculate marks from submitted answers
+        for student_answer in student_answers:
+            question = ExamQuestion.query.get(student_answer.question_id)
+            if question:
+                answered_count += 1
+                
+                is_correct = student_answer.selected_answer == question.correct_answer
+                marks_obtained = question.marks if is_correct else 0
+                
+                if is_correct:
+                    correct_count += 1
+                elif exam.negative_marking and exam.negative_marking > 0:
+                    marks_obtained -= exam.negative_marking
+                    if marks_obtained < 0:
+                        marks_obtained = 0
+                
+                obtained_marks += marks_obtained
+        
+        # Total marks is always the exam's total marks
+        total_marks = exam.total_marks if exam.total_marks else 0
+        
+        # Calculate percentage
+        percentage = (obtained_marks / total_marks * 100) if total_marks > 0 else 0
+        
+        # Get violation count
         violation_count = ViolationLog.query.filter_by(
             student_id=session.student_id,
             exam_id=session.exam_id
         ).count()
         
+        # Calculate time taken
+        time_taken = None
+        if session.start_time:
+            time_diff = datetime.utcnow() - session.start_time
+            time_taken = int(time_diff.total_seconds() / 60)  # Convert to minutes
+        
         result = ExamResult(
-            enrollment_id=enrollment.id,
+            enrollment_id=session.enrollment_id if session.enrollment_id else None,
             student_id=session.student_id,
             exam_id=session.exam_id,
-            obtained_marks=0,
-            total_marks=exam.total_marks,
-            percentage=0.0,
+            obtained_marks=obtained_marks,
+            total_marks=total_marks,
+            percentage=percentage,
             status='auto_submitted',
             violation_count=violation_count,
             final_trust_score=session.current_trust_score,
+            correct_answers=correct_count,
+            total_time_taken=time_taken,
             submitted_at=datetime.utcnow()
         )
         
         db.session.add(result)
         
-        # Notify examiner
-        notification = ExaminerNotification(
-            examiner_id=exam.examiner_id,
-            student_id=session.student_id,
-            exam_id=session.exam_id,
-            message=f"🔴 EXAM AUTO-SUBMITTED\nStudent: {session.student_id}\nReason: Trust Score Below 50%\nFinal Score: {session.current_trust_score}%",
-            severity_level='high',
-            is_read=False
-        )
-        db.session.add(notification)
-        
-        # Send email to student
-        user = User.query.get(session.student_id)
+        # Notify examiner (optional - don't crash if notification fails)
         try:
-            email_service.send_auto_submit_notification(
-                user.email,
-                exam.title,
-                "Trust score fell below 50% due to exam rule violations"
+            notification = ExaminerNotification(
+                examiner_id=exam.examiner_id,
+                student_id=session.student_id,
+                exam_id=session.exam_id,
+                message=f"🔴 EXAM AUTO-SUBMITTED\nStudent: {session.student_id}\nReason: Trust Score Below 50%\nScore: {obtained_marks}/{total_marks} ({percentage:.2f}%)\nFinal Trust Score: {session.current_trust_score}%",
+                severity_level='high',
+                is_read=False
             )
-        except:
-            pass
+            db.session.add(notification)
+        except Exception as notif_error:
+            logger.warning(f"Notification creation failed (non-critical): {str(notif_error)}")
         
-        db.session.commit()
+        # Commit all database changes
+        try:
+            db.session.commit()
+            logger.info("✅ Database commit successful")
+        except Exception as commit_error:
+            db.session.rollback()
+            logger.error(f"❌ Database commit failed: {str(commit_error)}")
+            import traceback
+            traceback.print_exc()
+            return None
         
-        logger.critical(f"Exam auto-submitted for student {session.student_id}")
+        # Send email to student AFTER successful commit (optional - don't crash if email fails)
+        try:
+            user = User.query.get(session.student_id)
+            if user and user.email:
+                email_service.send_auto_submit_notification(
+                    user.email,
+                    exam.title,
+                    "Trust score fell below 50% due to exam rule violations"
+                )
+        except Exception as email_error:
+            logger.warning(f"Email notification failed (non-critical): {str(email_error)}")
+            # Continue without email - this is not critical
         
-        return jsonify({
-            'message': 'Exam auto-submitted',
-            'reason': 'Trust score below 50%',
-            'final_trust_score': session.current_trust_score,
-            'final_status': 'auto_submitted'
-        }), 200
+        logger.critical(f"Exam auto-submitted for student {session.student_id}: {obtained_marks}/{total_marks} ({percentage:.2f}%)")
+        
+        return {
+            'obtained_marks': obtained_marks,
+            'total_marks': total_marks,
+            'percentage': round(percentage, 2),
+            'correct_answers': correct_count,
+            'violation_count': violation_count,
+            'final_trust_score': session.current_trust_score
+        }
         
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error auto-submitting: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        return None
 
 @proctoring_bp.route('/submit', methods=['POST'])
 @jwt_required()
@@ -289,6 +400,12 @@ def submit_exam():
         session.status = 'ended'
         session.end_time = datetime.utcnow()
         
+        # Calculate time taken
+        time_taken = None
+        if session.start_time:
+            time_diff = datetime.utcnow() - session.start_time
+            time_taken = int(time_diff.total_seconds() / 60)  # Convert to minutes
+        
         # Calculate result
         percentage = (obtained_marks / total_marks * 100) if total_marks > 0 else 0
         
@@ -298,11 +415,20 @@ def submit_exam():
         ).count()
         
         result = ExamResult(
+            enrollment_id=session.enrollment_id,
             student_id=student_id,
             exam_id=session.exam_id,
             obtained_marks=obtained_marks,
             total_marks=total_marks,
-            percentage=percentage
+            percentage=percentage,
+            status='completed',
+            violation_count=violation_count,
+            final_trust_score=session.current_trust_score,
+            correct_answers=correct_count,
+            incorrect_answers=len(answers) - correct_count,
+            unanswered=0,
+            total_time_taken=time_taken,
+            submitted_at=datetime.utcnow()
         )
         
         db.session.add(result)
@@ -319,7 +445,8 @@ def submit_exam():
                 'correct_answers': correct_count,
                 'total_questions': len(answers),
                 'violation_count': violation_count,
-                'final_trust_score': session.current_trust_score
+                'final_trust_score': session.current_trust_score,
+                'time_taken': time_taken
             }
         }), 200
         

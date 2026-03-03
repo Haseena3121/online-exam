@@ -152,17 +152,24 @@ class ExamResult(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
+    enrollment_id = db.Column(db.Integer)
     student_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'))
 
-    reviewed_by = db.Column(db.Integer)
     obtained_marks = db.Column(db.Float)
     total_marks = db.Column(db.Float)
     percentage = db.Column(db.Float)
-    final_trust_score = db.Column(db.Integer, default=100)
     status = db.Column(db.String(50), default='completed')
+    violation_count = db.Column(db.Integer, default=0)
+    final_trust_score = db.Column(db.Integer, default=100)
+    total_time_taken = db.Column(db.Integer)
+    correct_answers = db.Column(db.Integer, default=0)
+    incorrect_answers = db.Column(db.Integer, default=0)
+    unanswered = db.Column(db.Integer, default=0)
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
-
+    reviewed_by = db.Column(db.Integer)
+    reviewed_at = db.Column(db.DateTime)
+    remarks = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

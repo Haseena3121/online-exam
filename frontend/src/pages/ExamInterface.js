@@ -225,8 +225,8 @@ function ExamInterface() {
         }
         
         if (data.critical_message) {
-          // Auto-submit triggered
-          setSessionStatus('submitting');
+          // Auto-submit triggered by backend
+          setSessionStatus('ended');
           if (cameraRef.current?.stopProctoring) {
             cameraRef.current.stopProctoring();
           }
@@ -234,17 +234,27 @@ function ExamInterface() {
           // Show alert
           alert('🔴 ' + data.critical_message);
           
-          // Auto-submit the exam immediately
-          autoSubmitExam();
+          // Navigate to results - backend already created the result
+          navigate(`/results`, { 
+            state: { 
+              autoSubmitted: true,
+              reason: 'Trust score fell below 50%'
+            } 
+          });
         }
       } else {
         const errorData = await response.json();
-        console.error('❌ Failed to report violation:', response.status, errorData);
         
-        // If session ended, stop trying to report violations
-        if (errorData.error === 'No active session') {
+        // If session ended, stop trying to report violations silently
+        if (errorData.error === 'No active session' || response.status === 404) {
           console.log('⏸️ Session ended - stopping violation reports');
           setSessionStatus('ended');
+          // Stop proctoring to prevent further violation detection
+          if (cameraRef.current?.stopProctoring) {
+            cameraRef.current.stopProctoring();
+          }
+        } else {
+          console.error('❌ Failed to report violation:', response.status, errorData);
         }
       }
     } catch (error) {

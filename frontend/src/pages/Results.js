@@ -195,19 +195,22 @@ function Results() {
             <tbody>
               {results.map(result => (
                 <tr key={result.id}>
-                  <td className="exam-name">Exam #{result.exam_id}</td>
-                  <td className="score">{result.obtained_marks}/{result.total_marks}</td>
+                  <td className="exam-name">{result.exam_title || `Exam #${result.exam_id}`}</td>
+                  <td className="score">{result.obtained_marks || 0}/{result.total_marks || 0}</td>
                   <td className="percentage">{result.percentage ? result.percentage.toFixed(2) : '0.00'}%</td>
                   <td>
                     <span className={`badge badge-${result.status}`}>
-                      {result.status === 'pass' ? '✓ PASS' : result.status === 'fail' ? '✗ FAIL' : '⊙ AUTO'}
+                      {result.status === 'pass' ? '✓ PASS' : 
+                       result.status === 'fail' ? '✗ FAIL' : 
+                       result.status === 'auto_submitted' ? '⊙ AUTO' : 
+                       result.status === 'completed' ? '✓ DONE' : '⊙ ' + result.status.toUpperCase()}
                     </span>
                   </td>
-                  <td className="violations">{result.violation_count} 🚨</td>
+                  <td className="violations">{result.violation_count || 0} 🚨</td>
                   <td className={result.final_trust_score < 50 ? 'critical' : 'normal'}>
-                    {result.final_trust_score}%
+                    {result.final_trust_score || 100}%
                   </td>
-                  <td>{result.total_time_taken ? result.total_time_taken + ' min' : '-'}</td>
+                  <td>{result.total_time_taken ? result.total_time_taken + ' min' : 'N/A'}</td>
                   <td>{result.submitted_at ? new Date(result.submitted_at).toLocaleDateString() : 'N/A'}</td>
                   <td>
                     <button 

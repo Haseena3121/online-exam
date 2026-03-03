@@ -501,7 +501,9 @@ def get_exam_results(exam_id):
                 'id': exam.id,
                 'title': exam.title,
                 'total_marks': exam.total_marks,
-                'duration': exam.duration
+                'duration': exam.duration,
+                'auto_delete_enabled': exam.auto_delete_enabled if hasattr(exam, 'auto_delete_enabled') else False,
+                'auto_delete_date': exam.auto_delete_date.isoformat() + 'Z' if hasattr(exam, 'auto_delete_date') and exam.auto_delete_date else None
             },
             'results': results_data,
             'total_students': len(results_data)

@@ -16,6 +16,11 @@ class EmailService:
     def send_exam_enrollment_email(user_email, exam_title, exam_id):
         """Send exam enrollment confirmation"""
         try:
+            # Check if mail is configured
+            if not hasattr(mail, 'app') or mail.app is None:
+                logger.warning("Email service not configured - skipping email notification")
+                return
+            
             subject = f"✓ Successfully Enrolled: {exam_title}"
             html = f"""
             <html>
@@ -35,12 +40,17 @@ class EmailService:
             logger.info(f"Enrollment email sent to {user_email}")
             
         except Exception as e:
-            logger.error(f"Error sending enrollment email: {str(e)}")
+            logger.warning(f"Email notification failed (non-critical): {str(e)}")
 
     @staticmethod
     def send_exam_result_email(user_email, exam_title, score, total, status):
         """Send exam result email"""
         try:
+            # Check if mail is configured
+            if not hasattr(mail, 'app') or mail.app is None:
+                logger.warning("Email service not configured - skipping email notification")
+                return
+            
             percentage = (score / total * 100) if total > 0 else 0
             subject = f"📊 Your Exam Result: {exam_title}"
             
@@ -64,12 +74,17 @@ class EmailService:
             logger.info(f"Result email sent to {user_email}")
             
         except Exception as e:
-            logger.error(f"Error sending result email: {str(e)}")
+            logger.warning(f"Email notification failed (non-critical): {str(e)}")
 
     @staticmethod
     def send_violation_alert_email(examiner_email, student_email, exam_title, violation_type):
         """Send violation alert to examiner"""
         try:
+            # Check if mail is configured
+            if not hasattr(mail, 'app') or mail.app is None:
+                logger.warning("Email service not configured - skipping email notification")
+                return
+            
             subject = f"⚠️ Exam Violation Alert: {exam_title}"
             html = f"""
             <html>
@@ -89,12 +104,17 @@ class EmailService:
             logger.info(f"Violation alert sent to {examiner_email}")
             
         except Exception as e:
-            logger.error(f"Error sending violation alert: {str(e)}")
+            logger.warning(f"Email notification failed (non-critical): {str(e)}")
 
     @staticmethod
     def send_auto_submit_notification(user_email, exam_title, reason):
         """Send auto-submit notification"""
         try:
+            # Check if mail is configured
+            if not hasattr(mail, 'app') or mail.app is None:
+                logger.warning("Email service not configured - skipping email notification")
+                return
+            
             subject = f"⊙ Exam Auto-Submitted: {exam_title}"
             html = f"""
             <html>
@@ -113,7 +133,8 @@ class EmailService:
             logger.info(f"Auto-submit notification sent to {user_email}")
             
         except Exception as e:
-            logger.error(f"Error sending auto-submit notification: {str(e)}")
+            logger.warning(f"Email notification failed (non-critical): {str(e)}")
+            # Don't raise - email is optional
 
 # Initialize email service
 email_service = EmailService()
