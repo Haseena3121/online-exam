@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Navbar.css';
+import shieldLogo from '../assets/shield-logo.jpg';
 
 function Navbar() {
   const { user, logout } = useAuth();
@@ -19,7 +20,8 @@ function Navbar() {
     <nav className="navbar">
       <div className="navbar-container">
         <div className="navbar-brand">
-          <h2>🎓 Exam Proctoring</h2>
+          <img src={shieldLogo} alt="Logo" className="navbar-logo" />
+          <h2>Exam Proctoring</h2>
         </div>
         
         <div className="navbar-menu">

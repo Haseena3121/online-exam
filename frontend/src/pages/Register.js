@@ -95,96 +95,104 @@ function Register() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1>📚 Create Account</h1>
-          <p>Join Our Exam Platform</p>
+    <div className="auth-page">
+      <div className="auth-container-box register-box">
+        <div className="auth-header-title">
+          <div className="auth-logo-small">
+            <img 
+              src={require('../assets/shield-logo.jpg')} 
+              alt="Shield Logo" 
+              className="shield-logo-small"
+            />
+          </div>
+          <h1>CREATE ACCOUNT</h1>
+          <p className="auth-subtitle">Join Our Exam Platform</p>
         </div>
+
+        <div className="login-tab">Register</div>
+
+        {error && <div className="error-alert">{error}</div>}
         
-        {error && <div className="error-message">{error}</div>}
-        
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="name">👤 Full Name</label>
+        <form onSubmit={handleSubmit} className="login-form register-form">
+          <div className="input-group">
+            <span className="input-icon">👤</span>
             <input
-              id="name"
               type="text"
               name="name"
               value={formData.name}
               onChange={handleChange}
-              placeholder="Your full name"
+              placeholder="Full Name"
               required
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">📧 Email</label>
+          <div className="input-group">
+            <span className="input-icon">✉</span>
             <input
-              id="email"
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="your.email@example.com"
+              placeholder="Email"
               required
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="phone">📱 Phone (Optional)</label>
+          <div className="input-group">
+            <span className="input-icon">📱</span>
             <input
-              id="phone"
               type="tel"
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              placeholder="+1 234 567 8900"
+              placeholder="Phone (Optional)"
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">🔒 Password</label>
+          <div className="input-group">
+            <span className="input-icon">🔒</span>
             <input
-              id="password"
               type="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="Min 8 chars, 1 uppercase, 1 number, 1 special char"
+              placeholder="Password"
               required
             />
-            <small>Password must contain: Uppercase, Number, Special character</small>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">🔒 Confirm Password</label>
+          <div className="input-group">
+            <span className="input-icon">🔒</span>
             <input
-              id="confirmPassword"
               type="password"
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              placeholder="Re-enter password"
+              placeholder="Confirm Password"
               required
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="role">👨‍💼 Role</label>
-            <select name="role" id="role" value={formData.role} onChange={handleChange}>
+          <div className="input-group">
+            <span className="input-icon">👨‍💼</span>
+            <select name="role" value={formData.role} onChange={handleChange}>
               <option value="student">Student</option>
               <option value="examiner">Examiner</option>
             </select>
           </div>
 
-          <button type="submit" disabled={loading} className="btn btn-primary btn-block">
-            {loading ? '⏳ Creating Account...' : '✓ Register'}
+          <button type="submit" disabled={loading} className="btn-login-full">
+            {loading ? 'Creating Account...' : 'Register'}
           </button>
+
+          <Link to="/login" className="btn-register">
+            Already have an account? Login
+          </Link>
         </form>
 
-        <div className="auth-footer">
-          <p>Already have an account? <Link to="/login">Login here</Link></p>
+        <div className="auth-footer-text">
+          <p>© 2021 Ti Online Examination System Pro</p>
+          <p>A Product of Trakus Infotek</p>
         </div>
       </div>
     </div>
