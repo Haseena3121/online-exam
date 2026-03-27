@@ -185,6 +185,12 @@ function ExamResults() {
                         {result.violation_count} 🚨
                       </span>
                     </div>
+                    {result.total_time_taken && (
+                      <div className="result-metric">
+                        <span className="metric-label">Time Taken:</span>
+                        <span className="metric-value">⏱ {result.total_time_taken} min</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -313,6 +319,9 @@ function ExamResults() {
                 <h3>📅 Submission Details</h3>
                 <p><strong>Submitted At:</strong> {new Date(selectedStudent.submitted_at).toLocaleString()}</p>
                 <p><strong>Status:</strong> {selectedStudent.status || 'Completed'}</p>
+                {selectedStudent.total_time_taken && (
+                  <p><strong>⏱ Time Taken:</strong> {selectedStudent.total_time_taken} min</p>
+                )}
               </div>
             </div>
           </div>

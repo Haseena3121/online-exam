@@ -76,7 +76,7 @@ function ExamList() {
               </div>
               <button
                 className="btn btn-primary"
-                onClick={() => navigate(`/exam/${exam.id}/acceptance`)}
+                onClick={() => navigate(`/exam/${exam.id}/camera-test`)}
               >
                 Take Exam →
               </button>

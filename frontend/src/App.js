@@ -31,6 +31,7 @@ function App() {
           {/* Student Routes */}
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/camera-test" element={<CameraTest />} />
+          <Route path="/exam/:examId/camera-test" element={<CameraTest />} />
           <Route path="/exam-list" element={<ExamList />} />
           <Route path="/exam/:examId/acceptance" element={<AcceptanceForm />} />
           <Route path="/exam/:examId/:sessionId" element={<ExamInterface />} />

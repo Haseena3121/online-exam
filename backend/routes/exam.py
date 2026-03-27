@@ -483,6 +483,7 @@ def get_exam_results(exam_id):
                 'trust_score': result.final_trust_score if result.final_trust_score else (session.current_trust_score if session else 100),
                 'status': result.status if result.status else 'completed',
                 'violation_count': len(violations),
+                'total_time_taken': result.total_time_taken if hasattr(result, 'total_time_taken') and result.total_time_taken else None,
                 'violations': [{
                     'id': v.id,
                     'type': v.violation_type,
