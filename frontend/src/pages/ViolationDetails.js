@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -17,7 +18,7 @@ function ViolationDetails() {
 
   const fetchResultDetails = async () => {
     try {
-      const resultResponse = await fetch(`http://localhost:5000/api/results/detailed/${examId}`, {
+      const resultResponse = await fetch(`${API_BASE}/api/results/detailed/${examId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -28,7 +29,7 @@ function ViolationDetails() {
         setResult(resultData.result);
       }
 
-      const violationResponse = await fetch(`http://localhost:5000/api/violations/history/${examId}`, {
+      const violationResponse = await fetch(`${API_BASE}/api/violations/history/${examId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

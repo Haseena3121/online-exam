@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -134,7 +135,7 @@ function ExamInterface() {
   const fetchExamDetails = async () => {
     try {
       console.log('Fetching exam details for exam ID:', examId);
-      const response = await fetch(`http://localhost:5000/api/exams/${examId}`, {
+      const response = await fetch(`${API_BASE}/api/exams/${examId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -205,7 +206,7 @@ function ExamInterface() {
         formData.append('evidence', proof);
       }
 
-      const response = await fetch('http://localhost:5000/api/proctoring/violation', {
+      const response = await fetch(`${API_BASE}/api/proctoring/violation`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -278,7 +279,7 @@ function ExamInterface() {
         }))
       };
 
-      const response = await fetch('http://localhost:5000/api/proctoring/submit', {
+      const response = await fetch(`${API_BASE}/api/proctoring/submit`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -321,7 +322,7 @@ function ExamInterface() {
         auto_submitted: true
       };
 
-      const response = await fetch('http://localhost:5000/api/proctoring/submit', {
+      const response = await fetch(`${API_BASE}/api/proctoring/submit`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -18,15 +19,21 @@ def create_app():
     app = Flask(__name__)
 
     # ===============================
-    # DATABASE CONFIG (Using SQLite for easy setup)
+    # DATABASE CONFIG — env var first, fallback to SQLite
     # ===============================
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///exam_proctoring.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
+        'DATABASE_URL', 'sqlite:///exam_proctoring.db'
+    )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 3600,
+    }
 
     # ===============================
     # JWT CONFIG
     # ===============================
-    app.config['JWT_SECRET_KEY'] = 'super-secret-key'
+    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'super-secret-key')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
     # ===============================
@@ -34,7 +41,11 @@ def create_app():
     # ===============================
     CORS(app, resources={
         r"/api/*": {
-            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+            "origins": [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://frontend:3000",
+            ],
             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "Accept"],
             "supports_credentials": True,
@@ -42,10 +53,11 @@ def create_app():
         }
     })
     
-    # Add OPTIONS handler for all routes
     @app.after_request
     def after_request(response):
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
+        origin = response.headers.get('Access-Control-Allow-Origin')
+        if not origin:
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
         response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
         response.headers.add('Access-Control-Allow-Credentials', 'true')

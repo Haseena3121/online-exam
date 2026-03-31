@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -80,7 +81,7 @@ function CreateExam() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/exams/", {
+      const response = await fetch("${API_BASE}/api/exams/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -122,7 +123,7 @@ function CreateExam() {
     setLoading(true);
 
     try {
-      const response = await fetch(`http://localhost:5000/api/exams/${examId}/questions`, {
+      const response = await fetch(`${API_BASE}/api/exams/${examId}/questions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

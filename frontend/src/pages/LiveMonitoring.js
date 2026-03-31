@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -34,7 +35,7 @@ function LiveMonitoring() {
 
   const fetchActiveSessions = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/proctoring/monitor/active-sessions', {
+      const response = await fetch(`${API_BASE}/api/proctoring/monitor/active-sessions`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -53,7 +54,7 @@ function LiveMonitoring() {
 
   const fetchSessionDetails = async (sessionId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/proctoring/monitor/session/${sessionId}/details`, {
+      const response = await fetch(`${API_BASE}/api/proctoring/monitor/session/${sessionId}/details`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

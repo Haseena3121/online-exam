@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -32,7 +33,7 @@ function Results() {
 
   const fetchResults = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/results/all', {
+      const res = await fetch(`${API_BASE}/api/results/all`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -52,7 +53,7 @@ function Results() {
     setReviewLoading(true);
     setShowReview(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/results/${eId}/review`, {
+      const res = await fetch(`${API_BASE}/api/results/${eId}/review`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {

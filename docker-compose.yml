@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
 
   # =========================
@@ -15,19 +13,31 @@ services:
       MYSQL_USER: exam_user
       MYSQL_PASSWORD: exam_password
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   # =========================
   # Redis Cache
   # =========================
   redis:
-    image: redis:7
+    image: redis:7-alpine
     container_name: exam_redis
     restart: always
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   # =========================
   # Backend Flask App
@@ -39,18 +49,46 @@ services:
     container_name: exam_backend
     restart: always
     depends_on:
-      - mysql
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "5000:5000"
     environment:
       DATABASE_URL: mysql+pymysql://exam_user:exam_password@mysql/online_exam_proctoring
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET_KEY: your-super-secret-key
+      JWT_SECRET_KEY: change-this-in-production-please
       FLASK_ENV: production
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     volumes:
-      - ./backend/uploads:/app/uploads
+      - uploads_data:/app/uploads
       - ./backend/logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # =========================
+  # Frontend React App
+  # =========================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://localhost:5000
+    container_name: exam_frontend
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
 
 volumes:
   mysql_data:
+  uploads_data:

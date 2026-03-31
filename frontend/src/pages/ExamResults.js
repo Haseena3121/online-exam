@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +27,7 @@ function ExamResults() {
   const fetchResults = async () => {
     try {
       console.log('Fetching results for exam:', examId);
-      const response = await fetch(`http://localhost:5000/api/exams/${examId}/results`, {
+      const response = await fetch(`${API_BASE}/api/exams/${examId}/results`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

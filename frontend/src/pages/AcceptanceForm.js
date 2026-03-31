@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -96,7 +97,7 @@ function AcceptanceForm() {
     setLoading(true);
 
     try {
-      const res = await fetch(`http://localhost:5000/api/exams/${examId}/acceptance-form`, {
+      const res = await fetch(`${API_BASE}/api/exams/${examId}/acceptance-form`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -105,7 +106,7 @@ function AcceptanceForm() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Failed to submit'); setLoading(false); return; }
 
-      const startRes = await fetch(`http://localhost:5000/api/exams/${examId}/start`, {
+      const startRes = await fetch(`${API_BASE}/api/exams/${examId}/start`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
       });

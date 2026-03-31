@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -57,7 +58,7 @@ function ExaminerDashboard() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/exams/my-exams', {
+      const response = await fetch(`${API_BASE}/api/exams/my-exams`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -91,7 +92,7 @@ function ExaminerDashboard() {
 
   const togglePublish = async (examId, currentStatus) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/exams/${examId}/publish`, {
+      const response = await fetch(`${API_BASE}/api/exams/${examId}/publish`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

@@ -1,3 +1,4 @@
+import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -28,7 +29,7 @@ function Dashboard() {
     try {
       if (user.role === 'student') {
         // Fetch enrolled exams
-        const response = await fetch('http://localhost:5000/api/exams/', {
+        const response = await fetch(`${API_BASE}/api/exams/`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -45,7 +46,7 @@ function Dashboard() {
         }
       } else if (user.role === 'examiner') {
         // Fetch created exams
-        const response = await fetch('http://localhost:5000/api/exams/my-exams', {
+        const response = await fetch(`${API_BASE}/api/exams/my-exams`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
