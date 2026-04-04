@@ -267,7 +267,7 @@ function ExamResults() {
                             <div className="evidence-header">
                               <span className="evidence-label">📸 Evidence:</span>
                               <a
-                                href={violation.evidence_url}
+                                href={`${API_BASE}${violation.evidence_url}?token=${token}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="evidence-link-small"
@@ -276,34 +276,15 @@ function ExamResults() {
                               </a>
                             </div>
                             <div className="evidence-preview">
-                              {violation.evidence_url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
-                                <img
-                                  src={violation.evidence_url}
-                                  alt={`Evidence for ${violation.type}`}
-                                  className="evidence-image"
-                                  onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.nextSibling.style.display = 'block';
-                                  }}
-                                />
-                              ) : violation.evidence_url.match(/\.(mp4|avi|mov|webm)$/i) ? (
-                                <video
-                                  src={violation.evidence_url}
-                                  className="evidence-video"
-                                  controls
-                                  preload="metadata"
-                                  onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.nextSibling.style.display = 'block';
-                                  }}
-                                >
-                                  Your browser does not support video playback.
-                                </video>
-                              ) : (
-                                <div className="evidence-placeholder">
-                                  📄 Evidence file available
-                                </div>
-                              )}
+                              <img
+                                src={`${API_BASE}${violation.evidence_url}?token=${token}`}
+                                alt={`Evidence for ${violation.type}`}
+                                className="evidence-image"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'block';
+                                }}
+                              />
                               <div className="evidence-error" style={{display: 'none'}}>
                                 ❌ Could not load evidence file
                               </div>

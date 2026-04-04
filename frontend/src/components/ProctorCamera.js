@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import '../styles/ProctorCamera.css';
+import API_BASE from '../config';
 
-const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
+const ProctorCamera = React.forwardRef(({ sessionId, onViolation, token }, ref) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [cameraActive, setCameraActive] = useState(false);
@@ -9,6 +10,7 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
   const [isBlurred, setIsBlurred] = useState(false); // Changed to false - no blur by default
   const [violations, setViolations] = useState({});
   const detectionInterval = useRef(null);
+  const aiDetectionInterval = useRef(null);
   const violationCooldown = useRef({});
 
   useEffect(() => {
@@ -45,15 +47,63 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
   const startProctoring = () => {
     detectionInterval.current = setInterval(() => {
       performDetections();
-    }, 2000); // Check every 2 seconds
+    }, 2000);
+
+    // AI-based detection every 3 seconds
+    aiDetectionInterval.current = setInterval(() => {
+      sendFrameForAIDetection();
+    }, 3000);
+  };
+
+  const sendFrameForAIDetection = async () => {
+    if (!token) return;
+    const screenshot = await captureScreenshot();
+    if (!screenshot) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('frame', screenshot, 'frame.jpg');
+
+      const response = await fetch(`${API_BASE}/api/proctoring/analyze-frame`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (!response.ok) return;
+      const data = await response.json();
+      const d = data.detections || {};
+
+      // Phone detected
+      if (d.phone?.phone_detected && d.phone?.confidence > 0.4) {
+        captureScreenshot().then(s => onViolation?.('phone_detected', 'high', s));
+      }
+
+      // Multiple persons
+      if (d.persons?.multiple_persons) {
+        captureScreenshot().then(s => onViolation?.('multiple_persons', 'high', s));
+      }
+
+      // Face not visible
+      if (d.face && d.face.face_detected === false) {
+        captureScreenshot().then(s => onViolation?.('face_not_visible', 'medium', s));
+      }
+
+    } catch (e) {
+      console.error('AI detection error:', e);
+    }
   };
 
   const stopProctoring = () => {
     if (detectionInterval.current) {
       clearInterval(detectionInterval.current);
       detectionInterval.current = null;
-      console.log('⏸️ Proctoring detection stopped');
     }
+    if (aiDetectionInterval.current) {
+      clearInterval(aiDetectionInterval.current);
+      aiDetectionInterval.current = null;
+    }
+    console.log('⏸️ Proctoring detection stopped');
   };
 
   // Expose stopProctoring to parent component
@@ -148,10 +198,8 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
   };
 
   const checkBackgroundBlur = () => {
-    // Check if blur is disabled when it should be on
-    if (!isBlurred) {
-      reportViolationWithCooldown('blur_disabled', 'low', null);
-    }
+    // Only flag if blur was explicitly turned off by the user (tracked separately)
+    // Don't flag on initial load since blur is optional
   };
 
   const stopCamera = () => {
@@ -167,7 +215,9 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation }, ref) => {
     // Report violation if blur is turned off
     if (!newBlurState) {
       console.log('🚨 Blur disabled - reporting violation');
-      onViolation?.('blur_disabled', 'medium', null);
+      captureScreenshot().then(screenshot => {
+        onViolation?.('blur_disabled', 'medium', screenshot);
+      });
     }
   };
 

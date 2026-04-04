@@ -31,12 +31,21 @@ def save_evidence_file(file):
     try:
         os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         
-        if file and allowed_file(file.filename):
-            file_ext = file.filename.rsplit('.', 1)[1].lower()
-            filename = f"{uuid.uuid4()}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.{file_ext}"
+        if file:
+            # Determine extension from filename or content type
+            filename_ext = 'jpg'
+            if file.filename and '.' in file.filename:
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                if ext in ALLOWED_EXTENSIONS:
+                    filename_ext = ext
+            elif file.content_type:
+                ct_map = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'video/mp4': 'mp4'}
+                filename_ext = ct_map.get(file.content_type, 'jpg')
+
+            filename = f"{uuid.uuid4()}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.{filename_ext}"
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             file.save(filepath)
-            return f'/uploads/evidence/{filename}'
+            return filename  # store just the filename, not the full path
     except Exception as e:
         logger.error(f"Error saving file: {str(e)}")
     
@@ -65,7 +74,7 @@ def report_violation():
         evidence_path = None
         if 'evidence' in request.files:
             evidence_file = request.files['evidence']
-            if evidence_file and allowed_file(evidence_file.filename):
+            if evidence_file:
                 evidence_path = save_evidence_file(evidence_file)
         
         # Get trust score reduction
@@ -651,25 +660,106 @@ def get_session_details(session_id):
 
 
 @proctoring_bp.route('/evidence/<path:filename>', methods=['GET'])
-@jwt_required()
 def serve_evidence(filename):
-    """Serve evidence files (screenshots)"""
+    """Serve evidence files (screenshots) - token via query param for img src compatibility"""
     try:
-        user_id = int(get_jwt_identity())
+        from flask_jwt_extended import decode_token
+        from flask import request as freq
+
+        token = freq.args.get('token')
+        if not token:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        try:
+            decoded = decode_token(token)
+            user_id = int(decoded['sub'])
+        except Exception:
+            return jsonify({'error': 'Invalid token'}), 403
+
         user = User.query.get(user_id)
-        
-        # Only examiners can view evidence
         if not user or user.role != 'examiner':
             return jsonify({'error': 'Unauthorized'}), 403
-        
-        evidence_path = os.path.join(UPLOAD_FOLDER, filename)
-        
+
+        safe_filename = os.path.basename(filename)
+        evidence_path = os.path.join(UPLOAD_FOLDER, safe_filename)
+
         if not os.path.exists(evidence_path):
             return jsonify({'error': 'Evidence not found'}), 404
-        
+
         from flask import send_file
-        return send_file(evidence_path, mimetype='image/jpeg')
-        
+        return send_file(evidence_path)
+
     except Exception as e:
         logger.error(f"Error serving evidence: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@proctoring_bp.route('/analyze-frame', methods=['POST'])
+@jwt_required()
+def analyze_frame():
+    """Receive a camera frame and run phone/person/face detection"""
+    try:
+        student_id = int(get_jwt_identity())
+
+        session = ProctoringSession.query.filter_by(
+            student_id=student_id,
+            status='active'
+        ).first()
+
+        if not session:
+            return jsonify({'error': 'No active session'}), 404
+
+        if 'frame' not in request.files:
+            return jsonify({'error': 'No frame provided'}), 400
+
+        frame_file = request.files['frame']
+        frame_bytes = frame_file.read()
+
+        import numpy as np
+        import cv2
+        nparr = np.frombuffer(frame_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if frame is None:
+            return jsonify({'error': 'Invalid frame'}), 400
+
+        from ai_models.model_manager import get_detection_manager
+        manager = get_detection_manager()
+
+        detections = {}
+
+        # Phone detection
+        try:
+            if manager.phone_detector:
+                detections['phone'] = manager.phone_detector.detect_phone(frame)
+            else:
+                detections['phone'] = {'phone_detected': False}
+        except Exception as e:
+            logger.warning(f"Phone detection failed: {e}")
+            detections['phone'] = {'phone_detected': False}
+
+        # Multiple person detection
+        try:
+            if manager.person_detector:
+                detections['persons'] = manager.person_detector.detect_persons(frame)
+            else:
+                detections['persons'] = {'multiple_persons': False}
+        except Exception as e:
+            logger.warning(f"Person detection failed: {e}")
+            detections['persons'] = {'multiple_persons': False}
+
+        # Face detection
+        try:
+            if manager.face_detector:
+                detections['face'] = manager.face_detector.detect_face(frame)
+            else:
+                detections['face'] = {'face_detected': True}
+        except Exception as e:
+            logger.warning(f"Face detection failed: {e}")
+            detections['face'] = {'face_detected': True}
+
+        return jsonify({'detections': detections}), 200
+
+    except Exception as e:
+        logger.error(f"Error analyzing frame: {str(e)}")
         return jsonify({'error': str(e)}), 500

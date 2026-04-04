@@ -203,7 +203,7 @@ function ExamInterface() {
       formData.append('description', `Violation detected during exam`);
       
       if (proof) {
-        formData.append('evidence', proof);
+        formData.append('evidence', proof, 'screenshot.jpg');
       }
 
       const response = await fetch(`${API_BASE}/api/proctoring/violation`, {
@@ -457,6 +457,7 @@ function ExamInterface() {
               sessionId={sessionId}
               onViolation={handleViolation}
               examDuration={exam.duration}
+              token={token}
             />
             
             <div className="exam-progress">

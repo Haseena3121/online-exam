@@ -74,7 +74,7 @@ function Register() {
       alert('✓ Registration successful! Please login.');
       navigate('/login');
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError(`Connection error: ${err.message}. Is the backend running on port 5000?`);
     } finally {
       setLoading(false);
     }

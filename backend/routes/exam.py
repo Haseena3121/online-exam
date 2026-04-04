@@ -491,7 +491,7 @@ def get_exam_results(exam_id):
                     'description': v.description if hasattr(v, 'description') and v.description else None,
                     'reduction': v.trust_score_reduction,
                     'evidence_path': v.evidence_path if hasattr(v, 'evidence_path') and v.evidence_path else None,
-                    'evidence_url': f'http://localhost:5000/api/proctoring/evidence/{v.evidence_path.split("/")[-1]}' if hasattr(v, 'evidence_path') and v.evidence_path else None,
+                    'evidence_url': f'/api/proctoring/evidence/{v.evidence_path}' if hasattr(v, 'evidence_path') and v.evidence_path else None,
                     'time': v.created_at.isoformat() + 'Z' if v.created_at else None  # Add 'Z' to indicate UTC
                 } for v in violations],
                 'submitted_at': result.submitted_at.isoformat() + 'Z' if result.submitted_at else None  # Add 'Z' to indicate UTC
