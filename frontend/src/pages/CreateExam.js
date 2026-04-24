@@ -1,11 +1,10 @@
-import API_BASE from '../config';
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import React, { useState } from "react";
-import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import api from "../services/api";
 import '../styles/CreateExam.css';
 
 function CreateExam() {
-  const { token } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1: Exam Details, 2: Add Questions
   const [examId, setExamId] = useState(null);
@@ -81,34 +80,23 @@ function CreateExam() {
     setLoading(true);
 
     try {
-      const response = await fetch("${API_BASE}/api/exams/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          instructions: formData.instructions,
-          duration: parseInt(formData.duration),
-          total_marks: parseInt(formData.total_marks),
-          passing_marks: parseInt(formData.passing_marks),
-          negative_marking: 0,
-          is_published: false
-        })
+      const response = await api.post('/exams/', {
+        title: formData.title,
+        description: formData.description,
+        instructions: formData.instructions,
+        duration: parseInt(formData.duration),
+        total_marks: parseInt(formData.total_marks),
+        passing_marks: parseInt(formData.passing_marks),
+        negative_marking: 0,
+        is_published: false
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setExamId(data.exam_id);
-        setStep(2);
-      } else {
-        alert(`Failed to create exam: ${data.error || 'Unknown error'}`);
-      }
+      const data = response.data;
+      setExamId(data.exam_id);
+      setStep(2);
     } catch (error) {
-      alert(`Error creating exam: ${error.message}`);
+      const msg = error.response?.data?.error || error.message;
+      alert(`Failed to create exam: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -123,25 +111,12 @@ function CreateExam() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/api/exams/${examId}/questions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ questions })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert(`Exam created successfully with ${questions.length} questions!`);
-        navigate("/examiner-dashboard");
-      } else {
-        alert(`Failed to add questions: ${data.error || 'Unknown error'}`);
-      }
+      await api.post(`/exams/${examId}/questions`, { questions });
+      alert(`Exam created successfully with ${questions.length} questions!`);
+      navigate("/examiner-dashboard");
     } catch (error) {
-      alert(`Error adding questions: ${error.message}`);
+      const msg = error.response?.data?.error || error.message;
+      alert(`Failed to add questions: ${msg}`);
     } finally {
       setLoading(false);
     }

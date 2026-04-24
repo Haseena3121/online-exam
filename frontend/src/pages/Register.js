@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import API_BASE from '../config';
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';

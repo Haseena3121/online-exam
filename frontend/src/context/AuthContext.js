@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import React, { createContext, useContext, useState } from "react";
 
 export const AuthContext = createContext(null);

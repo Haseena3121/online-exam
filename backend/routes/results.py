@@ -113,3 +113,49 @@ def get_exam_review(exam_id):
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# ===============================
+# GET DETAILED RESULT (alias for review)
+# ===============================
+@results_bp.route('/detailed/<int:exam_id>', methods=['GET'])
+@jwt_required()
+def get_detailed_result(exam_id):
+    return get_exam_review(exam_id)
+
+
+# ===============================
+# GET ALL STUDENTS RESULTS FOR AN EXAM (Examiner)
+# ===============================
+@results_bp.route('/exam/<int:exam_id>/all-students', methods=['GET'])
+@jwt_required()
+def get_exam_all_results(exam_id):
+    try:
+        from models import ExamEnrollment
+        examiner_id = get_jwt_identity()
+        user = User.query.get(int(examiner_id))
+        if not user or user.role != 'examiner':
+            return jsonify({'error': 'Only examiners can view this'}), 403
+
+        results = ExamResult.query.filter_by(exam_id=exam_id).all()
+        data = []
+        for r in results:
+            student = User.query.get(r.student_id)
+            data.append({
+                'id': r.id,
+                'student_id': r.student_id,
+                'student_name': student.name if student else 'Unknown',
+                'student_email': student.email if student else '',
+                'obtained_marks': r.obtained_marks or 0,
+                'total_marks': r.total_marks or 0,
+                'percentage': r.percentage or 0,
+                'status': r.status,
+                'violation_count': r.violation_count or 0,
+                'final_trust_score': r.final_trust_score or 100,
+                'submitted_at': r.submitted_at.isoformat() + 'Z' if r.submitted_at else None
+            })
+        return jsonify({'results': data, 'total': len(data)}), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

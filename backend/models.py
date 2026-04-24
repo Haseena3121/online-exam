@@ -68,6 +68,22 @@ class Exam(db.Model):
     enrollments = db.relationship('ExamEnrollment', backref='exam', lazy=True)
     results = db.relationship('ExamResult', backref='exam', lazy=True)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'instructions': self.instructions,
+            'examiner_id': self.examiner_id,
+            'duration': self.duration,
+            'total_marks': self.total_marks,
+            'passing_marks': self.passing_marks,
+            'negative_marking': self.negative_marking,
+            'is_published': self.is_published,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
 
 # ============================
 # EXAM QUESTION
@@ -196,6 +212,21 @@ class ProctoringSession(db.Model):
     start_time = db.Column(db.DateTime, default=datetime.utcnow)
     end_time = db.Column(db.DateTime)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'student_id': self.student_id,
+            'exam_id': self.exam_id,
+            'enrollment_id': self.enrollment_id,
+            'current_trust_score': self.current_trust_score,
+            'status': self.status,
+            'camera_active': self.camera_active,
+            'mic_active': self.mic_active,
+            'screen_locked': self.screen_locked,
+            'start_time': self.start_time.isoformat() if self.start_time else None,
+            'end_time': self.end_time.isoformat() if self.end_time else None
+        }
+
 
 # ============================
 # EXAMINER NOTIFICATION
@@ -212,6 +243,18 @@ class ExaminerNotification(db.Model):
     severity_level = db.Column(db.String(20), default='medium')
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'examiner_id': self.examiner_id,
+            'student_id': self.student_id,
+            'exam_id': self.exam_id,
+            'message': self.message,
+            'severity_level': self.severity_level,
+            'is_read': self.is_read,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
 
 # ============================
@@ -233,7 +276,23 @@ class ViolationLog(db.Model):
     evidence_path = db.Column(db.String(255))
     trust_score_reduction = db.Column(db.Integer, default=10)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    # ============================
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'student_id': self.student_id,
+            'exam_id': self.exam_id,
+            'session_id': self.session_id,
+            'violation_type': self.violation_type,
+            'severity': self.severity,
+            'description': self.description,
+            'evidence_path': self.evidence_path,
+            'trust_score_reduction': self.trust_score_reduction,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+# ============================
 # SESSION ANALYTICS
 # ============================
 
@@ -242,10 +301,9 @@ class SessionAnalytics(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    session_id = db.Column(
-        db.Integer,
-        db.ForeignKey('proctoring_sessions.id')
-    )
+    session_id = db.Column(db.Integer, db.ForeignKey('proctoring_sessions.id'))
+    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=True)
 
     face_detected = db.Column(db.Boolean, default=True)
     multiple_faces_detected = db.Column(db.Boolean, default=False)
@@ -258,4 +316,39 @@ class SessionAnalytics(db.Model):
 
     trust_score_after_event = db.Column(db.Integer)
 
+    # Extended analytics counters
+    eye_gaze_warnings = db.Column(db.Integer, default=0)
+    phone_detection_count = db.Column(db.Integer, default=0)
+    tab_switch_count = db.Column(db.Integer, default=0)
+    sound_detection_count = db.Column(db.Integer, default=0)
+    multiple_persons_detected = db.Column(db.Integer, default=0)
+    blur_exit_attempts = db.Column(db.Integer, default=0)
+    face_not_visible_count = db.Column(db.Integer, default=0)
+    head_movement_warnings = db.Column(db.Integer, default=0)
+    total_violations = db.Column(db.Integer, default=0)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'session_id': self.session_id,
+            'eye_gaze_warnings': self.eye_gaze_warnings or 0,
+            'phone_detection_count': self.phone_detection_count or 0,
+            'tab_switch_count': self.tab_switch_count or 0,
+            'sound_detection_count': self.sound_detection_count or 0,
+            'multiple_persons_detected': self.multiple_persons_detected or 0,
+            'blur_exit_attempts': self.blur_exit_attempts or 0,
+            'face_not_visible_count': self.face_not_visible_count or 0,
+            'head_movement_warnings': self.head_movement_warnings or 0,
+            'total_violations': self.total_violations or 0,
+            'face_detected': self.face_detected,
+            'multiple_faces_detected': self.multiple_faces_detected,
+            'phone_detected': self.phone_detected,
+            'sound_detected': self.sound_detected,
+            'tab_switch_detected': self.tab_switch_detected,
+            'gaze_direction': self.gaze_direction,
+            'head_movement': self.head_movement,
+            'trust_score_after_event': self.trust_score_after_event,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

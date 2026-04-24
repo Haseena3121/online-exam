@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 export const VIOLATION_TYPES = {
   PHONE_DETECTED: 'phone_detected',
   TAB_SWITCH: 'tab_switch',

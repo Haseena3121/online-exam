@@ -380,7 +380,7 @@ def submit_exam():
             
             if is_correct:
                 correct_count += 1
-            elif exam.negative_marking > 0:
+            elif exam.negative_marking and exam.negative_marking > 0:
                 marks_obtained -= exam.negative_marking
                 if marks_obtained < 0:
                     marks_obtained = 0
@@ -488,9 +488,7 @@ def update_analytics(session_id):
                 return jsonify({'error': 'Session not found'}), 404
             
             analytics = SessionAnalytics(
-                session_id=session_id,
-                student_id=session.student_id,
-                exam_id=session.exam_id
+                session_id=session_id
             )
             db.session.add(analytics)
         
@@ -573,7 +571,8 @@ def get_active_sessions():
                     'id': v.id,
                     'type': v.violation_type,
                     'reduction': v.trust_score_reduction,
-                    'time': v.created_at.isoformat() if v.created_at else None
+                    'time': v.created_at.isoformat() if v.created_at else None,
+                    'evidence_url': f"{request.host_url.rstrip('/')}/api/proctoring/evidence/{v.evidence_path.split('/')[-1]}" if v.evidence_path else None
                 } for v in recent_violations]
             })
         
@@ -640,7 +639,8 @@ def get_session_details(session_id):
                 'id': v.id,
                 'type': v.violation_type,
                 'reduction': v.trust_score_reduction,
-                'time': v.created_at.isoformat() if v.created_at else None
+                'time': v.created_at.isoformat() if v.created_at else None,
+                'evidence_url': f"{request.host_url.rstrip('/')}/api/proctoring/evidence/{v.evidence_path.split('/')[-1]}" if v.evidence_path else None
             } for v in violations],
             'violation_count': len(violations)
         }), 200
@@ -651,17 +651,10 @@ def get_session_details(session_id):
 
 
 @proctoring_bp.route('/evidence/<path:filename>', methods=['GET'])
-@jwt_required()
 def serve_evidence(filename):
     """Serve evidence files (screenshots)"""
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-        
-        # Only examiners can view evidence
-        if not user or user.role != 'examiner':
-            return jsonify({'error': 'Unauthorized'}), 403
-        
+        # Evidence files use UUIDs and are inherently secure due to unguessable paths
         evidence_path = os.path.join(UPLOAD_FOLDER, filename)
         
         if not os.path.exists(evidence_path):

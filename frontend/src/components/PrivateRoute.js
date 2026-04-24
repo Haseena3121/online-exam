@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

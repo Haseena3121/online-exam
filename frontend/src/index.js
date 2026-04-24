@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";

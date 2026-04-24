@@ -108,7 +108,7 @@ def create_app():
     # ===============================
     @app.route("/")
     def home():
-        return jsonify({"message": "Backend Running Successfully 🚀"})
+        return jsonify({"message": "Backend Running Successfully :)"})
 
     return app
 
@@ -119,13 +119,13 @@ if __name__ == '__main__':
     # Create tables if they don't exist
     with app.app_context():
         db.create_all()
-        print("✅ Database tables created/verified")
+        print("* Database tables created/verified")
     
     print("=" * 60)
-    print("🚀 BACKEND SERVER STARTING")
+    print("* BACKEND SERVER STARTING")
     print("=" * 60)
-    print("📍 URL: http://127.0.0.1:5000")
-    print("📍 Frontend should connect to: http://localhost:5000")
+    print("* URL: http://127.0.0.1:5000")
+    print("* Frontend should connect to: http://localhost:5000")
     print("=" * 60)
     
     app.run(debug=True, host='0.0.0.0', port=5000)

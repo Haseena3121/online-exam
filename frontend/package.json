@@ -6,6 +6,7 @@
   "dependencies": {
     "@tensorflow-models/coco-ssd": "^2.2.3",
     "@tensorflow/tfjs": "^4.11.0",
+    "@vladmandic/face-api": "^1.7.15",
     "ajv": "^6.12.6",
     "axios": "^1.4.0",
     "date-fns": "^2.30.0",

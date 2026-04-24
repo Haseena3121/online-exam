@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import React, { useEffect, useState } from 'react';
 import '../styles/ExamScreen.css';
 

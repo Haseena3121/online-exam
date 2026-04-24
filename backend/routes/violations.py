@@ -21,7 +21,7 @@ def get_violation_history(exam_id):
         violations = ViolationLog.query.filter_by(
             student_id=student_id,
             exam_id=exam_id
-        ).order_by(ViolationLog.timestamp.desc()).all()
+        ).order_by(ViolationLog.created_at.desc()).all()
         
         return jsonify({
             'violations': [v.to_dict() for v in violations],
@@ -43,7 +43,7 @@ def get_exam_violations(exam_id):
         if user.role != 'examiner':
             return jsonify({'error': 'Only examiners can view'}), 403
         
-        violations = ViolationLog.query.filter_by(exam_id=exam_id).order_by(ViolationLog.timestamp.desc()).all()
+        violations = ViolationLog.query.filter_by(exam_id=exam_id).order_by(ViolationLog.created_at.desc()).all()
         
         grouped = {}
         for v in violations:

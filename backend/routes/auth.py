@@ -3,7 +3,7 @@ Authentication Routes
 """
 
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from datetime import timedelta
 from models import User
 from database import db
@@ -79,5 +79,23 @@ def login():
             'user': user.to_dict()
         }), 200
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ==============================
+# GET CURRENT USER
+# ==============================
+
+@auth_bp.route('/me', methods=['GET'])
+@jwt_required()
+def get_current_user():
+    try:
+        from flask_jwt_extended import get_jwt_identity
+        user_id = get_jwt_identity()
+        user = User.query.get(int(user_id))
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        return jsonify({'user': user.to_dict()}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
