@@ -17,7 +17,7 @@ PyJWT==2.10.1
 bcrypt==4.1.1
 
 # AI/ML Core
-opencv-python==4.10.0.84
+opencv-python-headless==4.10.0.84
 numpy==2.2.6
 Pillow==11.2.1
 scikit-learn==1.6.1
@@ -45,15 +45,5 @@ pytz==2023.3
 # Production Server
 gunicorn==21.2.0
 
-# Testing
-pytest==7.4.3
-pytest-cov==4.1.0
-pytest-flask==1.3.0
-
-# Code Quality
-pylint==3.0.3
-flake8==6.1.0
-black==23.12.0
-
-# Monitoring
+# Logging
 python-json-logger==2.0.7

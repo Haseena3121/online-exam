@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import '../styles/Dashboard.css';
+import Toast from '../components/Toast';
 
 function ExaminerDashboard() {
   const { token, user } = useAuth();
@@ -12,6 +13,9 @@ function ExaminerDashboard() {
   const [exams, setExams] = useState([]);
   const [selectedExam, setSelectedExam] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'info') => setToast({ message, type });
 
   // Check if user is examiner on component mount
   useEffect(() => {
@@ -29,7 +33,6 @@ function ExaminerDashboard() {
     
     if (currentUser.role !== 'examiner') {
       console.log('User is not examiner, role:', currentUser.role);
-      alert('Access denied. You must be logged in as an examiner.');
       navigate('/login');
       return;
     }
@@ -54,7 +57,6 @@ function ExaminerDashboard() {
       
       if (user.role !== 'examiner') {
         console.error('User is not an examiner:', user.role);
-        alert('You must be logged in as an examiner to access this page');
         navigate('/login');
         return;
       }
@@ -75,7 +77,6 @@ function ExaminerDashboard() {
         setExams(data.exams);
       } else if (response.status === 403) {
         console.error('403 Forbidden - Token invalid or user not examiner');
-        alert('Authentication failed. Please login again as an examiner.');
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
         navigate('/login');
@@ -103,14 +104,14 @@ function ExaminerDashboard() {
       });
 
       if (response.ok) {
-        alert(`Exam ${!currentStatus ? 'published' : 'unpublished'} successfully!`);
-        fetchExams(); // Refresh the list
+        showToast(`Exam ${!currentStatus ? 'published' : 'unpublished'} successfully!`, 'success');
+        fetchExams();
       } else {
-        alert('Failed to update exam status');
+        showToast('Failed to update exam status', 'error');
       }
     } catch (error) {
       console.error('Error updating exam:', error);
-      alert('Error updating exam status');
+      showToast('Error updating exam status', 'error');
     }
   };
 
@@ -118,6 +119,7 @@ function ExaminerDashboard() {
 
   return (
     <div className="examiner-dashboard">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <h1>👨‍🏫 Examiner Dashboard</h1>
 
       {/* Action Buttons */}

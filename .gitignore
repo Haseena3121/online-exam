@@ -1,1 +1,11 @@
 .env
+.env.production
+backend/.env
+backend/.env.production
+node_modules/
+frontend/build/
+__pycache__/
+*.pyc
+*.pyo
+uploads/
+*.db

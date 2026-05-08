@@ -1,0 +1,37 @@
+services:
+  # Backend Service
+  - type: web
+    name: exam-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: false
+      - key: JWT_SECRET_KEY
+        value: xK9#mP2$qL7nR4vT8wY1zA6bC3dE5fG0
+      - key: MONGO_URI
+        sync: false  # You'll add this manually from MongoDB Atlas
+      - key: REDIS_URL
+        sync: false  # You'll add this manually from Render Redis
+      - key: CORS_ORIGINS
+        value: https://exam-frontend.onrender.com
+    healthCheckPath: /
+
+  # Frontend Service
+  - type: web
+    name: exam-frontend
+    env: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://exam-backend.onrender.com
+
+  # Redis Service
+  - type: redis
+    name: exam-redis
+    plan: free
+    ipAllowList: []

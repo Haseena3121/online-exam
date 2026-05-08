@@ -4,6 +4,7 @@ import * as faceapi from '@vladmandic/face-api';
 import * as tf from '@tensorflow/tfjs';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import '../styles/ProctorCamera.css';
+import API_BASE from '../config';
 
 const ProctorCamera = React.forwardRef(({ sessionId, onViolation, examDuration, referenceDescriptor }, ref) => {
   const videoRef = useRef(null);
@@ -14,6 +15,7 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation, examDuration, 
   const [violations, setViolations] = useState({});
   const [cocoSsdModel, setCocoSsdModel] = useState(null);
   const detectionInterval = useRef(null);
+  const aiDetectionInterval = useRef(null);
   const violationCooldown = useRef({});
   const isDetectingRef = useRef(false); // Lock to prevent overlapping AI detections
 
@@ -55,8 +57,8 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation, examDuration, 
       }
     } catch (error) {
       console.error('Camera access denied:', error);
-      alert('⚠️ Camera access is required for exam proctoring');
       onViolation?.('camera_access_denied', 'high', null);
+      // Notify parent to show a toast — no browser alert
     }
   };
 
@@ -74,8 +76,12 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation, examDuration, 
     if (detectionInterval.current) {
       clearInterval(detectionInterval.current);
       detectionInterval.current = null;
-      console.log('⏸️ Proctoring detection stopped');
     }
+    if (aiDetectionInterval.current) {
+      clearInterval(aiDetectionInterval.current);
+      aiDetectionInterval.current = null;
+    }
+    console.log('⏸️ Proctoring detection stopped');
   };
 
   // Expose stopProctoring to parent component
@@ -176,6 +182,7 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation, examDuration, 
   const toggleBlur = () => {
     const newBlurState = !isBlurred;
     setIsBlurred(newBlurState);
+
   };
 
   return (

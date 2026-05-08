@@ -1,354 +1,255 @@
-from database import db
+"""
+MongoDB document helpers — replaces SQLAlchemy models.
+All data is stored as plain dicts in MongoDB collections.
+These classes provide to_dict() and password helpers only.
+"""
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-
-
-# ============================
-# USER MODEL
-# ============================
-
-class User(db.Model):
-    __tablename__ = 'users'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
-    email = db.Column(db.String(255), unique=True, nullable=False)
-    password = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), default='student')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    exams_created = db.relationship('Exam', backref='examiner', lazy=True)
-    enrollments = db.relationship('ExamEnrollment', backref='student', lazy=True)
-    results = db.relationship('ExamResult', backref='student_user', lazy=True)
-
-    def set_password(self, password):
-        self.password = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password, password)
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "email": self.email,
-            "role": self.role
-        }
-
-
-# ============================
-# EXAM MODEL
-# ============================
-
-class Exam(db.Model):
-    __tablename__ = 'exams'
-
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255), nullable=False)
-    description = db.Column(db.Text)
-    instructions = db.Column(db.Text)
-
-    examiner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-
-    duration = db.Column(db.Integer)
-    total_marks = db.Column(db.Integer)
-    passing_marks = db.Column(db.Integer)
-
-    negative_marking = db.Column(db.Float, default=0)
-    is_published = db.Column(db.Boolean, default=False)
-    is_active = db.Column(db.Boolean, default=True)
-
-    # Auto-deletion settings
-    auto_delete_enabled = db.Column(db.Boolean, default=False)  # False = Forever, True = Custom date
-    auto_delete_date = db.Column(db.DateTime, nullable=True)  # Date when exam should be deleted
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    questions = db.relationship('ExamQuestion', backref='exam', lazy=True)
-    enrollments = db.relationship('ExamEnrollment', backref='exam', lazy=True)
-    results = db.relationship('ExamResult', backref='exam', lazy=True)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'title': self.title,
-            'description': self.description,
-            'instructions': self.instructions,
-            'examiner_id': self.examiner_id,
-            'duration': self.duration,
-            'total_marks': self.total_marks,
-            'passing_marks': self.passing_marks,
-            'negative_marking': self.negative_marking,
-            'is_published': self.is_published,
-            'is_active': self.is_active,
-            'created_at': self.created_at.isoformat() if self.created_at else None
-        }
-
-
-# ============================
-# EXAM QUESTION
-# ============================
-
-class ExamQuestion(db.Model):
-    __tablename__ = 'exam_questions'
-
-    id = db.Column(db.Integer, primary_key=True)
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=False)
-
-    question_text = db.Column(db.Text, nullable=False)
-    option_a = db.Column(db.String(255))
-    option_b = db.Column(db.String(255))
-    option_c = db.Column(db.String(255))
-    option_d = db.Column(db.String(255))
-    correct_answer = db.Column(db.String(10))
-
-    marks = db.Column(db.Integer, default=1)
-    question_type = db.Column(db.String(50), default="mcq")
-    explanation = db.Column(db.Text)
-    order = db.Column(db.Integer)
-
-
-# ============================
-# STUDENT ANSWER
-# ============================
-
-class StudentAnswer(db.Model):
-    __tablename__ = 'student_answers'
-
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    question_id = db.Column(db.Integer, db.ForeignKey('exam_questions.id'))
-    selected_answer = db.Column(db.String(10))
-    marks_awarded = db.Column(db.Float, default=0)
-
-
-# ============================
-# EXAM ENROLLMENT
-# ============================
-
-class ExamEnrollment(db.Model):
-    __tablename__ = 'exam_enrollments'
-
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'))
-
-    enrollment_status = db.Column(db.String(50), default="enrolled")
-    enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-# ============================
-# ACCEPTANCE FORM
-# ============================
-
-class AcceptanceForm(db.Model):
-    __tablename__ = 'acceptance_forms'
-
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'))
-    enrollment_id = db.Column(db.Integer)
-
-    accepted = db.Column(db.Boolean, default=False)
-    rules_accepted = db.Column(db.Boolean, default=False)
-    honor_code_accepted = db.Column(db.Boolean, default=False)
-    privacy_accepted = db.Column(db.Boolean, default=False)
-    technical_requirements_met = db.Column(db.Boolean, default=False)
-
-    trust_score = db.Column(db.Integer, default=100)
-    acceptance_timestamp = db.Column(db.DateTime)
-
-
-# ============================
-# EXAM RESULT
-# ============================
-
-class ExamResult(db.Model):
-    __tablename__ = 'exam_results'
-
-    id = db.Column(db.Integer, primary_key=True)
-
-    enrollment_id = db.Column(db.Integer)
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'))
-
-    obtained_marks = db.Column(db.Float)
-    total_marks = db.Column(db.Float)
-    percentage = db.Column(db.Float)
-    status = db.Column(db.String(50), default='completed')
-    violation_count = db.Column(db.Integer, default=0)
-    final_trust_score = db.Column(db.Integer, default=100)
-    total_time_taken = db.Column(db.Integer)
-    correct_answers = db.Column(db.Integer, default=0)
-    incorrect_answers = db.Column(db.Integer, default=0)
-    unanswered = db.Column(db.Integer, default=0)
-    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
-    reviewed_by = db.Column(db.Integer)
-    reviewed_at = db.Column(db.DateTime)
-    remarks = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-# ============================
-# PROCTORING SESSION
-# ============================
-
-class ProctoringSession(db.Model):
-    __tablename__ = 'proctoring_sessions'
-
-    id = db.Column(db.Integer, primary_key=True)
-
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'))
-    enrollment_id = db.Column(db.Integer)
-
-    current_trust_score = db.Column(db.Integer, default=100)
-    status = db.Column(db.String(50), default="active")
-
-    camera_active = db.Column(db.Boolean, default=True)
-    mic_active = db.Column(db.Boolean, default=True)
-    screen_locked = db.Column(db.Boolean, default=True)
-
-    start_time = db.Column(db.DateTime, default=datetime.utcnow)
-    end_time = db.Column(db.DateTime)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'student_id': self.student_id,
-            'exam_id': self.exam_id,
-            'enrollment_id': self.enrollment_id,
-            'current_trust_score': self.current_trust_score,
-            'status': self.status,
-            'camera_active': self.camera_active,
-            'mic_active': self.mic_active,
-            'screen_locked': self.screen_locked,
-            'start_time': self.start_time.isoformat() if self.start_time else None,
-            'end_time': self.end_time.isoformat() if self.end_time else None
-        }
-
-
-# ============================
-# EXAMINER NOTIFICATION
-# ============================
-
-class ExaminerNotification(db.Model):
-    __tablename__ = 'examiner_notifications'
-
-    id = db.Column(db.Integer, primary_key=True)
-    examiner_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'))
-    message = db.Column(db.Text)
-    severity_level = db.Column(db.String(20), default='medium')
-    is_read = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'examiner_id': self.examiner_id,
-            'student_id': self.student_id,
-            'exam_id': self.exam_id,
-            'message': self.message,
-            'severity_level': self.severity_level,
-            'is_read': self.is_read,
-            'created_at': self.created_at.isoformat() if self.created_at else None
-        }
-
-
-# ============================
-# VIOLATION LOG
-# ============================
-
-class ViolationLog(db.Model):
-    __tablename__ = 'violations'
-
-    id = db.Column(db.Integer, primary_key=True)
-
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'))
-    session_id = db.Column(db.Integer, db.ForeignKey('proctoring_sessions.id'))
-
-    violation_type = db.Column(db.String(100))
-    severity = db.Column(db.String(20), default='medium')
-    description = db.Column(db.Text)
-    evidence_path = db.Column(db.String(255))
-    trust_score_reduction = db.Column(db.Integer, default=10)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'student_id': self.student_id,
-            'exam_id': self.exam_id,
-            'session_id': self.session_id,
-            'violation_type': self.violation_type,
-            'severity': self.severity,
-            'description': self.description,
-            'evidence_path': self.evidence_path,
-            'trust_score_reduction': self.trust_score_reduction,
-            'created_at': self.created_at.isoformat() if self.created_at else None
-        }
-
-
-# ============================
-# SESSION ANALYTICS
-# ============================
-
-class SessionAnalytics(db.Model):
-    __tablename__ = 'session_analytics'
-
-    id = db.Column(db.Integer, primary_key=True)
-
-    session_id = db.Column(db.Integer, db.ForeignKey('proctoring_sessions.id'))
-    student_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=True)
-
-    face_detected = db.Column(db.Boolean, default=True)
-    multiple_faces_detected = db.Column(db.Boolean, default=False)
-    phone_detected = db.Column(db.Boolean, default=False)
-    sound_detected = db.Column(db.Boolean, default=False)
-    tab_switch_detected = db.Column(db.Boolean, default=False)
-
-    gaze_direction = db.Column(db.String(50))
-    head_movement = db.Column(db.String(50))
-
-    trust_score_after_event = db.Column(db.Integer)
-
-    # Extended analytics counters
-    eye_gaze_warnings = db.Column(db.Integer, default=0)
-    phone_detection_count = db.Column(db.Integer, default=0)
-    tab_switch_count = db.Column(db.Integer, default=0)
-    sound_detection_count = db.Column(db.Integer, default=0)
-    multiple_persons_detected = db.Column(db.Integer, default=0)
-    blur_exit_attempts = db.Column(db.Integer, default=0)
-    face_not_visible_count = db.Column(db.Integer, default=0)
-    head_movement_warnings = db.Column(db.Integer, default=0)
-    total_violations = db.Column(db.Integer, default=0)
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'session_id': self.session_id,
-            'eye_gaze_warnings': self.eye_gaze_warnings or 0,
-            'phone_detection_count': self.phone_detection_count or 0,
-            'tab_switch_count': self.tab_switch_count or 0,
-            'sound_detection_count': self.sound_detection_count or 0,
-            'multiple_persons_detected': self.multiple_persons_detected or 0,
-            'blur_exit_attempts': self.blur_exit_attempts or 0,
-            'face_not_visible_count': self.face_not_visible_count or 0,
-            'head_movement_warnings': self.head_movement_warnings or 0,
-            'total_violations': self.total_violations or 0,
-            'face_detected': self.face_detected,
-            'multiple_faces_detected': self.multiple_faces_detected,
-            'phone_detected': self.phone_detected,
-            'sound_detected': self.sound_detected,
-            'tab_switch_detected': self.tab_switch_detected,
-            'gaze_direction': self.gaze_direction,
-            'head_movement': self.head_movement,
-            'trust_score_after_event': self.trust_score_after_event,
-            'created_at': self.created_at.isoformat() if self.created_at else None
-        }
+from bson import ObjectId
+
+
+def _str_id(doc):
+    """Convert ObjectId _id to string 'id' field."""
+    if doc and '_id' in doc:
+        doc['id'] = str(doc['_id'])
+        del doc['_id']
+    return doc
+
+
+# ── Helpers used by routes ──────────────────────────────────────────────────
+
+def make_user(name, email, password, role='student'):
+    return {
+        'name': name,
+        'email': email,
+        'password': generate_password_hash(password),
+        'role': role,
+        'created_at': datetime.utcnow()
+    }
+
+def check_user_password(user_doc, password):
+    return check_password_hash(user_doc['password'], password)
+
+def user_to_dict(user_doc):
+    return {
+        'id': str(user_doc['_id']),
+        'name': user_doc['name'],
+        'email': user_doc['email'],
+        'role': user_doc['role']
+    }
+
+
+def make_exam(title, description, instructions, examiner_id,
+              duration, total_marks, passing_marks,
+              negative_marking=0, is_published=False):
+    return {
+        'title': title,
+        'description': description,
+        'instructions': instructions,
+        'examiner_id': examiner_id,
+        'duration': duration,
+        'total_marks': total_marks,
+        'passing_marks': passing_marks,
+        'negative_marking': negative_marking,
+        'is_published': is_published,
+        'is_active': True,
+        'auto_delete_enabled': False,
+        'auto_delete_date': None,
+        'created_at': datetime.utcnow()
+    }
+
+def exam_to_dict(e):
+    return {
+        'id': str(e['_id']),
+        'title': e['title'],
+        'description': e.get('description'),
+        'instructions': e.get('instructions'),
+        'examiner_id': e['examiner_id'],
+        'duration': e.get('duration'),
+        'total_marks': e.get('total_marks'),
+        'passing_marks': e.get('passing_marks'),
+        'negative_marking': e.get('negative_marking', 0),
+        'is_published': e.get('is_published', False),
+        'is_active': e.get('is_active', True),
+        'auto_delete_enabled': e.get('auto_delete_enabled', False),
+        'auto_delete_date': e['auto_delete_date'].isoformat() if e.get('auto_delete_date') else None,
+        'created_at': e['created_at'].isoformat() if e.get('created_at') else None
+    }
+
+
+def make_question(exam_id, question_text, option_a, option_b, option_c, option_d,
+                  correct_answer, marks=1, question_type='mcq', order=0, explanation=None):
+    return {
+        'exam_id': exam_id,
+        'question_text': question_text,
+        'option_a': option_a,
+        'option_b': option_b,
+        'option_c': option_c,
+        'option_d': option_d,
+        'correct_answer': correct_answer,
+        'marks': marks,
+        'question_type': question_type,
+        'order': order,
+        'explanation': explanation
+    }
+
+
+def make_proctoring_session(student_id, exam_id, enrollment_id=None):
+    return {
+        'student_id': student_id,
+        'exam_id': exam_id,
+        'enrollment_id': enrollment_id,
+        'current_trust_score': 100,
+        'status': 'active',
+        'camera_active': True,
+        'mic_active': True,
+        'screen_locked': True,
+        'start_time': datetime.utcnow(),
+        'end_time': None
+    }
+
+def session_to_dict(s):
+    return {
+        'id': str(s['_id']),
+        'student_id': s['student_id'],
+        'exam_id': s['exam_id'],
+        'enrollment_id': s.get('enrollment_id'),
+        'current_trust_score': s.get('current_trust_score', 100),
+        'status': s.get('status', 'active'),
+        'camera_active': s.get('camera_active', True),
+        'mic_active': s.get('mic_active', True),
+        'screen_locked': s.get('screen_locked', True),
+        'start_time': s['start_time'].isoformat() if s.get('start_time') else None,
+        'end_time': s['end_time'].isoformat() if s.get('end_time') else None
+    }
+
+
+def make_violation(student_id, exam_id, session_id, violation_type,
+                   severity='medium', description=None, evidence_path=None,
+                   trust_score_reduction=10):
+    return {
+        'student_id': student_id,
+        'exam_id': exam_id,
+        'session_id': session_id,
+        'violation_type': violation_type,
+        'severity': severity,
+        'description': description,
+        'evidence_path': evidence_path,
+        'trust_score_reduction': trust_score_reduction,
+        'created_at': datetime.utcnow()
+    }
+
+def violation_to_dict(v):
+    return {
+        'id': str(v['_id']),
+        'student_id': v['student_id'],
+        'exam_id': v['exam_id'],
+        'session_id': v['session_id'],
+        'violation_type': v.get('violation_type'),
+        'severity': v.get('severity', 'medium'),
+        'description': v.get('description'),
+        'evidence_path': v.get('evidence_path'),
+        'trust_score_reduction': v.get('trust_score_reduction', 10),
+        'created_at': v['created_at'].isoformat() if v.get('created_at') else None
+    }
+
+
+def make_exam_result(student_id, exam_id, enrollment_id, obtained_marks, total_marks,
+                     percentage, status='completed', violation_count=0,
+                     final_trust_score=100, correct_answers=0, incorrect_answers=0,
+                     unanswered=0, total_time_taken=None):
+    now = datetime.utcnow()
+    return {
+        'student_id': student_id,
+        'exam_id': exam_id,
+        'enrollment_id': enrollment_id,
+        'obtained_marks': obtained_marks,
+        'total_marks': total_marks,
+        'percentage': percentage,
+        'status': status,
+        'violation_count': violation_count,
+        'final_trust_score': final_trust_score,
+        'correct_answers': correct_answers,
+        'incorrect_answers': incorrect_answers,
+        'unanswered': unanswered,
+        'total_time_taken': total_time_taken,
+        'submitted_at': now,
+        'created_at': now,
+        'reviewed_by': None,
+        'reviewed_at': None,
+        'remarks': None
+    }
+
+
+def make_notification(examiner_id, student_id, exam_id, message, severity_level='medium'):
+    return {
+        'examiner_id': examiner_id,
+        'student_id': student_id,
+        'exam_id': exam_id,
+        'message': message,
+        'severity_level': severity_level,
+        'is_read': False,
+        'created_at': datetime.utcnow()
+    }
+
+def notification_to_dict(n):
+    return {
+        'id': str(n['_id']),
+        'examiner_id': n['examiner_id'],
+        'student_id': n['student_id'],
+        'exam_id': n['exam_id'],
+        'message': n.get('message'),
+        'severity_level': n.get('severity_level', 'medium'),
+        'is_read': n.get('is_read', False),
+        'created_at': n['created_at'].isoformat() if n.get('created_at') else None
+    }
+
+
+def make_analytics(session_id, student_id=None, exam_id=None):
+    return {
+        'session_id': session_id,
+        'student_id': student_id,
+        'exam_id': exam_id,
+        'face_detected': True,
+        'multiple_faces_detected': False,
+        'phone_detected': False,
+        'sound_detected': False,
+        'tab_switch_detected': False,
+        'gaze_direction': None,
+        'head_movement': None,
+        'trust_score_after_event': None,
+        'eye_gaze_warnings': 0,
+        'phone_detection_count': 0,
+        'tab_switch_count': 0,
+        'sound_detection_count': 0,
+        'multiple_persons_detected': 0,
+        'blur_exit_attempts': 0,
+        'face_not_visible_count': 0,
+        'head_movement_warnings': 0,
+        'total_violations': 0,
+        'created_at': datetime.utcnow()
+    }
+
+def analytics_to_dict(a):
+    return {
+        'id': str(a['_id']),
+        'session_id': a['session_id'],
+        'eye_gaze_warnings': a.get('eye_gaze_warnings', 0),
+        'phone_detection_count': a.get('phone_detection_count', 0),
+        'tab_switch_count': a.get('tab_switch_count', 0),
+        'sound_detection_count': a.get('sound_detection_count', 0),
+        'multiple_persons_detected': a.get('multiple_persons_detected', 0),
+        'blur_exit_attempts': a.get('blur_exit_attempts', 0),
+        'face_not_visible_count': a.get('face_not_visible_count', 0),
+        'head_movement_warnings': a.get('head_movement_warnings', 0),
+        'total_violations': a.get('total_violations', 0),
+        'face_detected': a.get('face_detected', True),
+        'multiple_faces_detected': a.get('multiple_faces_detected', False),
+        'phone_detected': a.get('phone_detected', False),
+        'sound_detected': a.get('sound_detected', False),
+        'tab_switch_detected': a.get('tab_switch_detected', False),
+        'gaze_direction': a.get('gaze_direction'),
+        'head_movement': a.get('head_movement'),
+        'trust_score_after_event': a.get('trust_score_after_event'),
+        'created_at': a['created_at'].isoformat() if a.get('created_at') else None
+    }

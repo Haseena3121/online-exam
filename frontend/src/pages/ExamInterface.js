@@ -7,6 +7,7 @@ import ProctorCamera from '../components/ProctorCamera';
 import CountdownTimer from '../components/CountdownTimer';
 import * as faceapi from '@vladmandic/face-api';
 import ViolationWarning from '../components/ViolationWarning';
+import Toast from '../components/Toast';
 import '../styles/ExamScreen.css';
 
 function ExamInterface() {
@@ -24,6 +25,8 @@ function ExamInterface() {
   const [showWarning, setShowWarning] = useState(false);
   const [violationMessage, setViolationMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+  const showToast = (message, type = 'info') => setToast({ message, type });
   const [examStarted, setExamStarted] = useState(false); // New flag
   const [verified, setVerified] = useState(false); // For Pre-Exam Check
   const [referenceDescriptor, setReferenceDescriptor] = useState(null);
@@ -66,6 +69,11 @@ function ExamInterface() {
 
   const startSetupCamera = async () => {
     try {
+      // Camera API requires HTTPS or localhost — check first
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setSetupError('Camera access requires HTTPS. Please use https:// or access from localhost. On Chrome mobile, go to chrome://flags and enable "Insecure origins treated as secure" for this address.');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: true });
       if (setupVideoRef.current) {
         setupVideoRef.current.srcObject = stream;
@@ -224,11 +232,11 @@ function ExamInterface() {
       setExam(data);
       setQuestions(data.questions || []);
       if (!data.questions || data.questions.length === 0) {
-        alert('This exam has no questions. Please contact the examiner.');
+        showToast('This exam has no questions. Please contact the examiner.', 'warning');
       }
     } catch (error) {
       console.error('Error fetching exam:', error);
-      alert('Failed to load exam. Please try again.');
+      showToast('Failed to load exam. Please try again.', 'error');
       navigate('/exam-list');
     } finally {
       setLoading(false);
@@ -255,6 +263,9 @@ function ExamInterface() {
   };
 
   const handleViolation = (violationType, severity, proof) => {
+    if (violationType === 'camera_access_denied') {
+      showToast('⚠️ Camera access is required for exam proctoring', 'warning');
+    }
     reportViolation(violationType, severity, proof);
   };
 
@@ -267,6 +278,7 @@ function ExamInterface() {
       const formData = new FormData();
       formData.append('violation_type', violationType);
       formData.append('severity', severity);
+
       formData.append('description', 'Violation detected during exam');
       if (proof) formData.append('evidence', proof, 'screenshot.jpg');
 
@@ -301,8 +313,8 @@ function ExamInterface() {
       if (data.critical_message) {
         setSessionStatus('ended');
         if (cameraRef.current?.stopProctoring) cameraRef.current.stopProctoring();
-        alert('🔴 ' + data.critical_message);
-        navigate('/results', { state: { autoSubmitted: true, reason: 'Trust score fell below 50%' } });
+        showToast('🔴 ' + data.critical_message, 'error');
+        setTimeout(() => navigate('/results', { state: { autoSubmitted: true, reason: 'Trust score fell below 50%' } }), 2000);
       }
     } catch (error) {
       const errData = error.response?.data;
@@ -332,7 +344,7 @@ function ExamInterface() {
       navigate(`/result/${examId}`, { state: { result: response.data.result } });
     } catch (error) {
       console.error('Submit error:', error);
-      alert('Error submitting exam: ' + (error.response?.data?.error || error.message));
+      showToast('Error submitting exam: ' + (error.response?.data?.error || error.message), 'error');
       setSessionStatus('active');
     }
   };
@@ -408,6 +420,7 @@ function ExamInterface() {
 
   return (
     <div className="exam-screen">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       {showWarning && <ViolationWarning message={violationMessage} />}
       
       <div className="exam-header">
