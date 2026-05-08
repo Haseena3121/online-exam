@@ -15,6 +15,6 @@ RUN pip install --no-cache-dir -r requirements.prod.txt
 COPY . .
 RUN mkdir -p uploads/evidence
 
-EXPOSE 5000
+EXPOSE 8000
 
-CMD gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120 "app:create_app()"
+CMD gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120 "app:create_app()"

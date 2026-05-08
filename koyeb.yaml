@@ -1,0 +1,21 @@
+services:
+  - name: exam-backend
+    type: web
+    git:
+      repository: github.com/Haseena3121/online-exam
+      branch: main
+    docker:
+      dockerfile: backend/Dockerfile
+      context: backend
+    ports:
+      - port: 8000
+        protocol: http
+    env:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: JWT_SECRET_KEY
+        value: xK9#mP2$qL7nR4vT8wY1zA6bC3dE5fG0
+      - key: MONGO_URI
+        value: mongodb+srv://skaishu75_db_user:exam1234@cluster0.jmkjzts.mongodb.net/exam_proctoring?retryWrites=true&w=majority&appName=Cluster0
