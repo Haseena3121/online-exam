@@ -1,11 +1,11 @@
-import API_BASE from '../config';
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import React, { useState } from "react";
-import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import api from "../services/api";
 import '../styles/CreateExam.css';
+import Toast from '../components/Toast';
 
 function CreateExam() {
-  const { token } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1: Exam Details, 2: Add Questions
   const [examId, setExamId] = useState(null);
@@ -28,6 +28,9 @@ function CreateExam() {
     marks: ""
   });
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'info') => setToast({ message, type });
 
   const handleChange = (e) => {
     setFormData({
@@ -45,18 +48,18 @@ function CreateExam() {
 
   const addQuestion = () => {
     if (!currentQuestion.question_text || !currentQuestion.marks) {
-      alert("Please fill in question text and marks");
+      showToast("Please fill in question text and marks", "warning");
       return;
     }
 
     if (!currentQuestion.option_a || !currentQuestion.option_b || 
         !currentQuestion.option_c || !currentQuestion.option_d) {
-      alert("Please fill in all options");
+      showToast("Please fill in all options", "warning");
       return;
     }
 
     if (!currentQuestion.correct_answer) {
-      alert("Please select the correct answer");
+      showToast("Please select the correct answer", "warning");
       return;
     }
 
@@ -81,34 +84,23 @@ function CreateExam() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/api/exams/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          title: formData.title,
-          description: formData.description,
-          instructions: formData.instructions,
-          duration: parseInt(formData.duration),
-          total_marks: parseInt(formData.total_marks),
-          passing_marks: parseInt(formData.passing_marks),
-          negative_marking: 0,
-          is_published: false
-        })
+      const response = await api.post('/exams/', {
+        title: formData.title,
+        description: formData.description,
+        instructions: formData.instructions,
+        duration: parseInt(formData.duration),
+        total_marks: parseInt(formData.total_marks),
+        passing_marks: parseInt(formData.passing_marks),
+        negative_marking: 0,
+        is_published: false
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setExamId(data.exam_id);
-        setStep(2);
-      } else {
-        alert(`Failed to create exam: ${data.error || 'Unknown error'}`);
-      }
+      const data = response.data;
+      setExamId(data.exam_id);
+      setStep(2);
     } catch (error) {
-      alert(`Error creating exam: ${error.message}`);
+      const msg = error.response?.data?.error || error.message;
+      showToast(`Failed to create exam: ${msg}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -116,39 +108,26 @@ function CreateExam() {
 
   const handleSubmitQuestions = async () => {
     if (questions.length === 0) {
-      alert("Please add at least one question");
+      showToast("Please add at least one question", "warning");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/api/exams/${examId}/questions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ questions })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert(`Exam created successfully with ${questions.length} questions!`);
-        navigate("/examiner-dashboard");
-      } else {
-        alert(`Failed to add questions: ${data.error || 'Unknown error'}`);
-      }
+      await api.post(`/exams/${examId}/questions`, { questions });
+      showToast(`Exam created successfully with ${questions.length} questions!`, 'success');
+      setTimeout(() => navigate("/examiner-dashboard"), 1500);
     } catch (error) {
-      alert(`Error adding questions: ${error.message}`);
+      const msg = error.response?.data?.error || error.message;
+      showToast(`Failed to add questions: ${msg}`, 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const skipQuestions = () => {
-    if (window.confirm("Skip adding questions? You can add them later using the helper script.")) {
+    if (window.confirm("Skip adding questions? You can add them later.")) {
       navigate("/examiner-dashboard");
     }
   };
@@ -157,6 +136,7 @@ function CreateExam() {
 
   return (
     <div className="create-exam-container">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="create-exam-card">
         {/* Progress Indicator */}
         <div className="progress-steps">

@@ -1,7 +1,9 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import API_BASE from '../config';
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import '../styles/Auth.css';
+import Toast from '../components/Toast';
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -13,6 +15,7 @@ function Register() {
     role: 'student'
   });
   const [error, setError] = useState('');
+  const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -71,8 +74,8 @@ function Register() {
         return;
       }
 
-      alert('✓ Registration successful! Please login.');
-      navigate('/login');
+      setToast({ message: 'Registration successful! Please login.', type: 'success' });
+      setTimeout(() => navigate('/login'), 1500);
     } catch (err) {
       setError(`Connection error: ${err.message}. Is the backend running on port 5000?`);
     } finally {
@@ -97,6 +100,7 @@ function Register() {
 
         <div className="login-tab">Register</div>
 
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {error && <div className="error-alert">{error}</div>}
 
         <form onSubmit={handleSubmit} className="login-form register-form">

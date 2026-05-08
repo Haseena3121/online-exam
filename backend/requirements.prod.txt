@@ -1,0 +1,49 @@
+# Flask Core
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-JWT-Extended==4.5.3
+Flask-PyMongo==2.3.0
+Flask-Mail==0.9.1
+
+# Database
+pymongo==4.6.1
+
+# Environment
+python-dotenv==1.0.0
+
+# Security
+Werkzeug==3.0.1
+PyJWT==2.10.1
+bcrypt==4.1.1
+
+# AI/ML Core
+opencv-python-headless==4.10.0.84
+numpy==2.2.6
+Pillow==11.2.1
+scikit-learn==1.6.1
+
+# Audio Processing
+librosa==0.10.2
+soundfile==0.12.1
+scipy==1.15.3
+
+# Real-time & WebSocket
+python-socketio==5.9.0
+python-engineio==4.7.1
+
+# Cache & Task Queue
+redis==5.0.1
+celery==5.3.4
+
+# HTTP & Requests
+requests==2.31.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Production Server
+gunicorn==21.2.0
+
+# Logging
+python-json-logger==2.0.7

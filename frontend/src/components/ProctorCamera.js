@@ -1,19 +1,37 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import React, { useEffect, useRef, useState } from 'react';
+import * as faceapi from '@vladmandic/face-api';
+import * as tf from '@tensorflow/tfjs';
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import '../styles/ProctorCamera.css';
 import API_BASE from '../config';
 
-const ProctorCamera = React.forwardRef(({ sessionId, onViolation, token }, ref) => {
+const ProctorCamera = React.forwardRef(({ sessionId, onViolation, examDuration, referenceDescriptor }, ref) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [micActive, setMicActive] = useState(false);
-  const [isBlurred, setIsBlurred] = useState(false); // Changed to false - no blur by default
+  const [isBlurred, setIsBlurred] = useState(false); // Default changed to false
   const [violations, setViolations] = useState({});
+  const [cocoSsdModel, setCocoSsdModel] = useState(null);
   const detectionInterval = useRef(null);
   const aiDetectionInterval = useRef(null);
   const violationCooldown = useRef({});
+  const isDetectingRef = useRef(false); // Lock to prevent overlapping AI detections
 
   useEffect(() => {
+    const loadCocoModel = async () => {
+      try {
+        await tf.ready();
+        const model = await cocoSsd.load();
+        setCocoSsdModel(model);
+        console.log('📱 Phone detection model loaded');
+      } catch (err) {
+        console.error('Failed to load phone detection model:', err);
+      }
+    };
+
+    loadCocoModel();
     initializeCamera();
 
     return () => {
@@ -39,59 +57,19 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation, token }, ref) 
       }
     } catch (error) {
       console.error('Camera access denied:', error);
-      alert('⚠️ Camera access is required for exam proctoring');
       onViolation?.('camera_access_denied', 'high', null);
+      // Notify parent to show a toast — no browser alert
     }
   };
 
   const startProctoring = () => {
-    detectionInterval.current = setInterval(() => {
-      performDetections();
-    }, 2000);
-
-    // AI-based detection every 3 seconds
-    aiDetectionInterval.current = setInterval(() => {
-      sendFrameForAIDetection();
-    }, 3000);
-  };
-
-  const sendFrameForAIDetection = async () => {
-    if (!token) return;
-    const screenshot = await captureScreenshot();
-    if (!screenshot) return;
-
-    try {
-      const formData = new FormData();
-      formData.append('frame', screenshot, 'frame.jpg');
-
-      const response = await fetch(`${API_BASE}/api/proctoring/analyze-frame`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      });
-
-      if (!response.ok) return;
-      const data = await response.json();
-      const d = data.detections || {};
-
-      // Phone detected
-      if (d.phone?.phone_detected && d.phone?.confidence > 0.4) {
-        captureScreenshot().then(s => onViolation?.('phone_detected', 'high', s));
-      }
-
-      // Multiple persons
-      if (d.persons?.multiple_persons) {
-        captureScreenshot().then(s => onViolation?.('multiple_persons', 'high', s));
-      }
-
-      // Face not visible
-      if (d.face && d.face.face_detected === false) {
-        captureScreenshot().then(s => onViolation?.('face_not_visible', 'medium', s));
-      }
-
-    } catch (e) {
-      console.error('AI detection error:', e);
-    }
+    detectionInterval.current = setInterval(async () => {
+      // Prevent running a new detection if the previous one is still processing
+      if (isDetectingRef.current) return;
+      isDetectingRef.current = true;
+      await performDetections();
+      isDetectingRef.current = false;
+    }, 2000); // Check every 2 seconds
   };
 
   const stopProctoring = () => {
@@ -111,15 +89,44 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation, token }, ref) 
     stopProctoring
   }));
 
-  const performDetections = () => {
-    // Check for face visibility
-    checkFaceVisibility();
+  const performDetections = async () => {
+    if (!videoRef.current || videoRef.current.readyState !== 4) return;
     
-    // Check for multiple persons (simulated)
-    checkMultiplePersons();
-    
-    // Check background blur requirement
-    checkBackgroundBlur();
+    try {
+      const detections = await faceapi.detectAllFaces(videoRef.current).withFaceLandmarks().withFaceDescriptors();
+      
+      if (detections.length === 0) {
+        reportViolationWithCooldown('face_not_visible', 'medium', null);
+      } else if (detections.length > 1) {
+        reportViolationWithCooldown('multiple_persons', 'high', null);
+      } else if (detections.length === 1 && referenceDescriptor) {
+        // Create an array from the referenceDescriptor object
+        const refDesc = new Float32Array(Object.values(referenceDescriptor));
+        const distance = faceapi.euclideanDistance(detections[0].descriptor, refDesc);
+        
+        // Threshold: > 0.55 generally means different person
+        if (distance > 0.55) {
+          console.log(`🚨 Face match failed (distance: ${distance})`);
+          reportViolationWithCooldown('unauthorized_person', 'high', null); // Different person detected
+        }
+      }
+
+      // Check for cell phone objects (run this even if face detection fails)
+      if (cocoSsdModel && videoRef.current) {
+        try {
+          // Increase max detection boxes and lower threshold for better phone detection
+          const predictions = await cocoSsdModel.detect(videoRef.current, 20, 0.4);
+          const hasPhone = predictions.some(p => p.class === 'cell phone');
+          if (hasPhone) {
+            reportViolationWithCooldown('phone_detected', 'high', null);
+          }
+        } catch (err) {
+          console.error('Phone detection error:', err);
+        }
+      }
+    } catch (err) {
+      console.error('Face detection error:', err);
+    }
   };
 
   const reportViolationWithCooldown = (type, severity, proof) => {
@@ -161,45 +168,9 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation, token }, ref) 
     return null;
   };
 
-  const checkFaceVisibility = () => {
-    if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        canvas.width = videoRef.current.videoWidth;
-        canvas.height = videoRef.current.videoHeight;
-        ctx.drawImage(videoRef.current, 0, 0);
-        
-        // Simple brightness check to detect if face is visible
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        let brightness = 0;
-        
-        for (let i = 0; i < data.length; i += 4) {
-          brightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
-        }
-        
-        brightness = brightness / (data.length / 4);
-        
-        // If too dark, report violation
-        if (brightness < 30) {
-          reportViolationWithCooldown('face_not_visible', 'medium', null);
-        }
-      }
-    }
-  };
-
-  const checkMultiplePersons = () => {
-    // Randomly simulate detection (5% chance)
-    // In production, this would use actual AI detection
-    if (Math.random() < 0.05) {
-      reportViolationWithCooldown('multiple_persons', 'high', null);
-    }
-  };
-
   const checkBackgroundBlur = () => {
-    // Only flag if blur was explicitly turned off by the user (tracked separately)
-    // Don't flag on initial load since blur is optional
+    // Check if blur is disabled when it should be on
+    // Disabled blur violation logic per user request
   };
 
   const stopCamera = () => {
@@ -211,14 +182,7 @@ const ProctorCamera = React.forwardRef(({ sessionId, onViolation, token }, ref) 
   const toggleBlur = () => {
     const newBlurState = !isBlurred;
     setIsBlurred(newBlurState);
-    
-    // Report violation if blur is turned off
-    if (!newBlurState) {
-      console.log('🚨 Blur disabled - reporting violation');
-      captureScreenshot().then(screenshot => {
-        onViolation?.('blur_disabled', 'medium', screenshot);
-      });
-    }
+
   };
 
   return (

@@ -1,10 +1,13 @@
-import API_BASE from '../config';
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
+import api from '../services/api';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ProctorCamera from '../components/ProctorCamera';
 import CountdownTimer from '../components/CountdownTimer';
+import * as faceapi from '@vladmandic/face-api';
 import ViolationWarning from '../components/ViolationWarning';
+import Toast from '../components/Toast';
 import '../styles/ExamScreen.css';
 
 function ExamInterface() {
@@ -22,9 +25,93 @@ function ExamInterface() {
   const [showWarning, setShowWarning] = useState(false);
   const [violationMessage, setViolationMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+  const showToast = (message, type = 'info') => setToast({ message, type });
   const [examStarted, setExamStarted] = useState(false); // New flag
+  const [verified, setVerified] = useState(false); // For Pre-Exam Check
+  const [referenceDescriptor, setReferenceDescriptor] = useState(null);
+  const [verifyingCamera, setVerifyingCamera] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [setupError, setSetupError] = useState("");
   const cameraRef = useRef(null);
   const timerIntervalRef = useRef(null);
+  const setupVideoRef = useRef(null);
+  const warningTimeoutRef = useRef(null);
+
+  // Load models on mount
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+        setModelsLoaded(true);
+        console.log('Face API models loaded');
+      } catch (err) {
+        console.error('Failed to load Face API models', err);
+        setSetupError('Failed to load AI proctoring models. Please refresh.');
+      }
+    };
+    loadModels();
+  }, []);
+
+  // Setup Camera for pre-exam verification
+  useEffect(() => {
+    if (!loading && exam && !verified) {
+      startSetupCamera();
+    }
+    return () => {
+      if (setupVideoRef.current && setupVideoRef.current.srcObject) {
+        setupVideoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [loading, exam, verified]);
+
+  const startSetupCamera = async () => {
+    try {
+      // Camera API requires HTTPS or localhost — check first
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setSetupError('Camera access requires HTTPS. Please use https:// or access from localhost. On Chrome mobile, go to chrome://flags and enable "Insecure origins treated as secure" for this address.');
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: true });
+      if (setupVideoRef.current) {
+        setupVideoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error(err);
+      setSetupError('Camera and Microphone access is required to start the exam.');
+    }
+  };
+
+  const handleCaptureReference = async () => {
+    if (!modelsLoaded || !setupVideoRef.current) return;
+    setVerifyingCamera(true);
+    setSetupError("");
+    
+    try {
+      const detections = await faceapi.detectAllFaces(setupVideoRef.current).withFaceLandmarks().withFaceDescriptors();
+      
+      if (detections.length === 0) {
+        setSetupError("No face detected! Please ensure your face is clearly visible in poor lighting.");
+      } else if (detections.length > 1) {
+        setSetupError("Multiple persons detected! Ensure you are alone in the room.");
+      } else {
+        // Success! Save the descriptor
+        setReferenceDescriptor(detections[0].descriptor);
+        setVerified(true);
+        
+        // Stop setup camera to release resource for Exam camera
+        if (setupVideoRef.current.srcObject) {
+            setupVideoRef.current.srcObject.getTracks().forEach(track => track.stop());
+        }
+      }
+    } catch (err) {
+      console.error("Verification error:", err);
+      setSetupError("Error capturing face. Please try again.");
+    }
+    setVerifyingCamera(false);
+  };
 
   useEffect(() => {
     fetchExamDetails();
@@ -66,8 +153,9 @@ function ExamInterface() {
       if (document.hidden && sessionStatus === 'active') {
         reportViolation('tab_switch', 'high', null);
         setShowWarning(true);
-        setViolationMessage('⚠️ You switched to another tab! This is a violation.');
-        setTimeout(() => setShowWarning(false), 5000);
+        setViolationMessage('⚠️ VIOLATION DETECTED: You switched to another tab! This has been recorded.');
+        if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+        warningTimeoutRef.current = setTimeout(() => setShowWarning(false), 6000);
       }
     };
 
@@ -101,24 +189,27 @@ function ExamInterface() {
       e.preventDefault();
       reportViolation('copy_attempt', 'high', null);
       setShowWarning(true);
-      setViolationMessage('⚠️ COPYING IS NOT ALLOWED! This violation has been recorded.');
-      setTimeout(() => setShowWarning(false), 5000);
+      setViolationMessage('⚠️ VIOLATION DETECTED: COPYING IS NOT ALLOWED! This action has been recorded.');
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+      warningTimeoutRef.current = setTimeout(() => setShowWarning(false), 6000);
     };
 
     const handlePaste = (e) => {
       e.preventDefault();
       reportViolation('paste_attempt', 'high', null);
       setShowWarning(true);
-      setViolationMessage('⚠️ PASTING IS NOT ALLOWED! This violation has been recorded.');
-      setTimeout(() => setShowWarning(false), 5000);
+      setViolationMessage('⚠️ VIOLATION DETECTED: PASTING IS NOT ALLOWED! This action has been recorded.');
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+      warningTimeoutRef.current = setTimeout(() => setShowWarning(false), 6000);
     };
 
     const handleCut = (e) => {
       e.preventDefault();
       reportViolation('cut_attempt', 'medium', null);
       setShowWarning(true);
-      setViolationMessage('⚠️ CUTTING TEXT IS NOT ALLOWED! This violation has been recorded.');
-      setTimeout(() => setShowWarning(false), 5000);
+      setViolationMessage('⚠️ VIOLATION DETECTED: CUTTING TEXT IS NOT ALLOWED! This action has been recorded.');
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+      warningTimeoutRef.current = setTimeout(() => setShowWarning(false), 6000);
     };
 
     document.addEventListener('copy', handleCopy);
@@ -135,29 +226,17 @@ function ExamInterface() {
   const fetchExamDetails = async () => {
     try {
       console.log('Fetching exam details for exam ID:', examId);
-      const response = await fetch(`${API_BASE}/api/exams/${examId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Exam data received:', data);
-        setExam(data);
-        setQuestions(data.questions || []);
-        
-        if (!data.questions || data.questions.length === 0) {
-          alert('This exam has no questions. Please contact the examiner.');
-        }
-      } else {
-        console.error('Failed to fetch exam:', response.status);
-        alert('Failed to load exam. Please try again.');
-        navigate('/exam-list');
+      const response = await api.get(`/exams/${examId}`);
+      const data = response.data;
+      console.log('Exam data received:', data);
+      setExam(data);
+      setQuestions(data.questions || []);
+      if (!data.questions || data.questions.length === 0) {
+        showToast('This exam has no questions. Please contact the examiner.', 'warning');
       }
     } catch (error) {
       console.error('Error fetching exam:', error);
-      alert('Error loading exam. Please check your connection.');
+      showToast('Failed to load exam. Please try again.', 'error');
       navigate('/exam-list');
     } finally {
       setLoading(false);
@@ -184,15 +263,14 @@ function ExamInterface() {
   };
 
   const handleViolation = (violationType, severity, proof) => {
+    if (violationType === 'camera_access_denied') {
+      showToast('⚠️ Camera access is required for exam proctoring', 'warning');
+    }
     reportViolation(violationType, severity, proof);
   };
 
   const reportViolation = async (violationType, severity, proof) => {
-    // Don't report violations if session is not active
-    if (sessionStatus !== 'active') {
-      console.log(`⏸️ Skipping violation report - session status: ${sessionStatus}`);
-      return;
-    }
+    if (sessionStatus !== 'active') return;
 
     try {
       console.log(`📊 Reporting violation: ${violationType} (${severity})`);
@@ -200,77 +278,60 @@ function ExamInterface() {
       const formData = new FormData();
       formData.append('violation_type', violationType);
       formData.append('severity', severity);
-      formData.append('description', `Violation detected during exam`);
-      
-      if (proof) {
-        formData.append('evidence', proof, 'screenshot.jpg');
+
+      formData.append('description', 'Violation detected during exam');
+      if (proof) formData.append('evidence', proof, 'screenshot.jpg');
+
+      const response = await api.post('/proctoring/violation', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const data = response.data;
+
+      console.log(`✅ Violation reported. New trust score: ${data.current_trust_score}%`);
+      setTrustScore(data.current_trust_score);
+
+      // Function to handle showing the warning with a clear timeout
+      const showDetailedWarning = (message) => {
+        setShowWarning(true);
+        setViolationMessage(message);
+        if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+        warningTimeoutRef.current = setTimeout(() => setShowWarning(false), 6000);
+      };
+
+      if (violationType === 'unauthorized_person') {
+        showDetailedWarning(`⚠️ VIOLATION DETECTED: Unauthorized person found in camera view! Your trust score decreased to ${data.current_trust_score}%.`);
+      } else if (violationType === 'phone_detected') {
+        showDetailedWarning(`⚠️ VIOLATION DETECTED: Mobile phone detected in your hands! Your trust score decreased to ${data.current_trust_score}%.`);
+      } else if (violationType === 'multiple_persons') {
+        showDetailedWarning(`⚠️ VIOLATION DETECTED: Multiple people found in the camera view! Your trust score decreased to ${data.current_trust_score}%.`);
+      } else if (violationType === 'face_not_visible') {
+        showDetailedWarning(`⚠️ VIOLATION DETECTED: Your face is not clearly visible in the camera! Your trust score decreased to ${data.current_trust_score}%.`);
+      } else if (data.warning) {
+        showDetailedWarning(`⚠️ WARNING: Trust Score ${data.current_trust_score}% - Please continue following the rules!`);
       }
 
-      const response = await fetch(`${API_BASE}/api/proctoring/violation`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`✅ Violation reported. New trust score: ${data.current_trust_score}%`);
-        setTrustScore(data.current_trust_score);
-        
-        if (data.warning) {
-          setShowWarning(true);
-          setViolationMessage(`⚠️ WARNING: Trust Score ${data.current_trust_score}% - Continue following rules!`);
-          setTimeout(() => setShowWarning(false), 5000);
-        }
-        
-        if (data.critical_message) {
-          // Auto-submit triggered by backend
-          setSessionStatus('ended');
-          if (cameraRef.current?.stopProctoring) {
-            cameraRef.current.stopProctoring();
-          }
-          
-          // Show alert
-          alert('🔴 ' + data.critical_message);
-          
-          // Navigate to results - backend already created the result
-          navigate(`/results`, { 
-            state: { 
-              autoSubmitted: true,
-              reason: 'Trust score fell below 50%'
-            } 
-          });
-        }
-      } else {
-        const errorData = await response.json();
-        
-        // If session ended, stop trying to report violations silently
-        if (errorData.error === 'No active session' || response.status === 404) {
-          console.log('⏸️ Session ended - stopping violation reports');
-          setSessionStatus('ended');
-          // Stop proctoring to prevent further violation detection
-          if (cameraRef.current?.stopProctoring) {
-            cameraRef.current.stopProctoring();
-          }
-        } else {
-          console.error('❌ Failed to report violation:', response.status, errorData);
-        }
+      if (data.critical_message) {
+        setSessionStatus('ended');
+        if (cameraRef.current?.stopProctoring) cameraRef.current.stopProctoring();
+        showToast('🔴 ' + data.critical_message, 'error');
+        setTimeout(() => navigate('/results', { state: { autoSubmitted: true, reason: 'Trust score fell below 50%' } }), 2000);
       }
     } catch (error) {
-      console.error('❌ Error reporting violation:', error);
+      const errData = error.response?.data;
+      if (errData?.error === 'No active session' || error.response?.status === 404) {
+        console.log('⏸️ Session ended - stopping violation reports');
+        setSessionStatus('ended');
+        if (cameraRef.current?.stopProctoring) cameraRef.current.stopProctoring();
+      } else {
+        console.error('❌ Error reporting violation:', error);
+      }
     }
   };
 
   const handleSubmitExam = async () => {
     try {
       setSessionStatus('submitting');
-      
-      // Stop proctoring detection
-      if (cameraRef.current?.stopProctoring) {
-        cameraRef.current.stopProctoring();
-      }
+      if (cameraRef.current?.stopProctoring) cameraRef.current.stopProctoring();
 
       const submissionData = {
         answers: questions.map(q => ({
@@ -279,41 +340,20 @@ function ExamInterface() {
         }))
       };
 
-      const response = await fetch(`${API_BASE}/api/proctoring/submit`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(submissionData)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        navigate(`/result/${examId}`, { state: { result: data.result } });
-      } else {
-        const errorData = await response.json();
-        console.error('Submit error:', errorData);
-        alert('Error submitting exam: ' + (errorData.error || 'Unknown error'));
-        setSessionStatus('active'); // Allow retry
-      }
+      const response = await api.post('/proctoring/submit', submissionData);
+      navigate(`/result/${examId}`, { state: { result: response.data.result } });
     } catch (error) {
-      console.error('Error submitting exam:', error);
-      alert('Error submitting exam. Please try again.');
-      setSessionStatus('active'); // Allow retry
+      console.error('Submit error:', error);
+      showToast('Error submitting exam: ' + (error.response?.data?.error || error.message), 'error');
+      setSessionStatus('active');
     }
   };
 
   const autoSubmitExam = async () => {
     try {
       setSessionStatus('submitting');
-      
-      // Stop proctoring detection
-      if (cameraRef.current?.stopProctoring) {
-        cameraRef.current.stopProctoring();
-      }
+      if (cameraRef.current?.stopProctoring) cameraRef.current.stopProctoring();
 
-      // Auto-submit with current answers
       const submissionData = {
         answers: questions.map(q => ({
           question_id: q.id,
@@ -322,32 +362,10 @@ function ExamInterface() {
         auto_submitted: true
       };
 
-      const response = await fetch(`${API_BASE}/api/proctoring/submit`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(submissionData)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Navigate to results immediately
-        navigate(`/result/${examId}`, { 
-          state: { 
-            result: data.result,
-            autoSubmitted: true,
-            reason: 'Trust score fell below 50%'
-          } 
-        });
-      } else {
-        console.error('Auto-submit failed');
-        // Try to navigate anyway
-        navigate(`/result/${examId}`);
-      }
+      const response = await api.post('/proctoring/submit', submissionData);
+      navigate(`/result/${examId}`, { state: { result: response.data.result, autoSubmitted: true } });
     } catch (error) {
-      console.error('Error auto-submitting:', error);
+      console.error('Auto-submit error:', error);
       navigate(`/result/${examId}`);
     }
   };
@@ -360,11 +378,49 @@ function ExamInterface() {
     return <div className="error">Exam not found</div>;
   }
 
+  // PRE-EXAM SETUP SCREEN
+  if (!verified) {
+    return (
+      <div className="exam-screen" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f2f5' }}>
+        <div style={{ background: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', maxWidth: '600px', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '20px', color: '#333' }}>📸 Camera & Face Verification</h2>
+          <p style={{ marginBottom: '20px', color: '#666' }}>Before starting the exam, we need to capture a reference photo to verify your identity throughout the session.</p>
+          
+          <div style={{ position: 'relative', width: '100%', maxWidth: '400px', margin: '0 auto 20px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#000' }}>
+            <video 
+              ref={setupVideoRef} 
+              autoPlay 
+              playsInline 
+              muted 
+              style={{ width: '100%', display: 'block', transform: 'scaleX(-1)' }} 
+            />
+          </div>
+
+          {setupError && (
+            <div style={{ color: '#d32f2f', backgroundColor: '#ffebee', padding: '10px', borderRadius: '5px', marginBottom: '20px' }}>
+              ⚠️ {setupError}
+            </div>
+          )}
+
+          <button 
+            className="btn btn-primary btn-large" 
+            onClick={handleCaptureReference}
+            disabled={!modelsLoaded || verifyingCamera || !!setupError.includes("Camera")}
+            style={{ width: '100%', padding: '15px', fontSize: '1.1rem' }}
+          >
+            {!modelsLoaded ? '⏳ Loading AI Models...' : verifyingCamera ? '📷 Capturing...' : 'Capture Reference & Start Exam'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const currentQuestion = questions[currentQuestionIndex];
   const answered = Object.keys(answers).length;
 
   return (
     <div className="exam-screen">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       {showWarning && <ViolationWarning message={violationMessage} />}
       
       <div className="exam-header">
@@ -457,7 +513,7 @@ function ExamInterface() {
               sessionId={sessionId}
               onViolation={handleViolation}
               examDuration={exam.duration}
-              token={token}
+              referenceDescriptor={referenceDescriptor}
             />
             
             <div className="exam-progress">

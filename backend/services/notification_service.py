@@ -1,99 +1,73 @@
 """
-Notification service for real-time updates
+Notification service — MongoDB
 """
 import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+
 class NotificationService:
-    """Handle notifications"""
-    
+
     @staticmethod
-    def create_violation_notification(examiner_id, student_id, exam_id, violation_id, message, proof_type=None, proof_url=None):
-        """Create violation notification"""
-        from models import ExaminerNotification, db
-        
+    def create_violation_notification(examiner_id, student_id, exam_id, violation_id,
+                                      message, proof_type=None, proof_url=None):
+        from database import mongo
+        from models import make_notification
         try:
-            notification = ExaminerNotification(
-                examiner_id=examiner_id,
-                student_id=student_id,
-                exam_id=exam_id,
-                violation_id=violation_id,
-                message=message,
-                proof_type=proof_type or 'alert',
-                proof_url=proof_url,
-                is_read=False,
-                severity_level='high',
-                created_at=datetime.utcnow()
+            doc = make_notification(
+                examiner_id=examiner_id, student_id=student_id,
+                exam_id=exam_id, message=message, severity_level='high'
             )
-            
-            db.session.add(notification)
-            db.session.commit()
-            
-            logger.info(f"Violation notification created for examiner {examiner_id}")
-            return notification
-            
+            doc['violation_id'] = violation_id
+            doc['proof_type'] = proof_type or 'alert'
+            doc['proof_url'] = proof_url
+            mongo.db.examiner_notifications.insert_one(doc)
+            logger.info(f"Notification created for examiner {examiner_id}")
+            return doc
         except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error creating notification: {str(e)}")
+            logger.error(f"Error creating notification: {e}")
             return None
-    
+
     @staticmethod
     def mark_as_read(notification_id, user_id):
-        """Mark notification as read"""
-        from models import ExaminerNotification, db
-        
+        from database import mongo
+        from bson import ObjectId
         try:
-            notification = ExaminerNotification.query.get(notification_id)
-            
-            if not notification or notification.examiner_id != user_id:
+            n = mongo.db.examiner_notifications.find_one({'_id': ObjectId(notification_id)})
+            if not n or n['examiner_id'] != user_id:
                 return False
-            
-            notification.is_read = True
-            db.session.commit()
-            
-            logger.info(f"Notification {notification_id} marked as read")
+            mongo.db.examiner_notifications.update_one(
+                {'_id': ObjectId(notification_id)}, {'$set': {'is_read': True}}
+            )
             return True
-            
         except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error marking notification: {str(e)}")
+            logger.error(f"Error marking notification: {e}")
             return False
-    
+
     @staticmethod
     def get_unread_count(examiner_id):
-        """Get unread notification count"""
-        from models import ExaminerNotification
-        
+        from database import mongo
         try:
-            count = ExaminerNotification.query.filter_by(
-                examiner_id=examiner_id,
-                is_read=False
-            ).count()
-            
-            return count
-            
+            return mongo.db.examiner_notifications.count_documents(
+                {'examiner_id': examiner_id, 'is_read': False}
+            )
         except Exception as e:
-            logger.error(f"Error getting unread count: {str(e)}")
+            logger.error(f"Error getting unread count: {e}")
             return 0
-    
+
     @staticmethod
     def get_recent_notifications(examiner_id, limit=10):
-        """Get recent notifications"""
-        from models import ExaminerNotification
-        
+        from database import mongo
+        from models import notification_to_dict
         try:
-            notifications = ExaminerNotification.query.filter_by(
-                examiner_id=examiner_id
-            ).order_by(
-                ExaminerNotification.created_at.desc()
-            ).limit(limit).all()
-            
-            return [n.to_dict() for n in notifications]
-            
+            notifications = list(mongo.db.examiner_notifications.find(
+                {'examiner_id': examiner_id}
+            ).sort('created_at', -1).limit(limit))
+            return [notification_to_dict(n) for n in notifications]
         except Exception as e:
-            logger.error(f"Error getting notifications: {str(e)}")
+            logger.error(f"Error getting notifications: {e}")
             return []
+
 
 notification_service = NotificationService()

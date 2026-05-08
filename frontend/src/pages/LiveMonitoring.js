@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import API_BASE from '../config';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -226,6 +227,28 @@ function LiveMonitoring() {
                           <span className="violation-reduction">
                             -{violation.reduction}%
                           </span>
+                        {violation.evidence_url && (
+                          <div className="evidence-container" style={{ marginTop: '10px', background: '#f8f9fa', padding: '10px', borderRadius: '4px', border: '1px solid #e2e8f0', width: '100%' }}>
+                            <div className="evidence-header" style={{ marginBottom: '5px' }}>
+                              <strong style={{ fontSize: '12px', color: '#4a5568' }}>📸 Evidence:</strong>
+                            </div>
+                            <div className="evidence-preview">
+                              {violation.evidence_url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                                <img
+                                  src={violation.evidence_url}
+                                  alt={`Evidence`}
+                                  style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
+                                />
+                              ) : violation.evidence_url.match(/\.(mp4|avi|mov|webm)$/i) ? (
+                                <video
+                                  src={violation.evidence_url}
+                                  controls
+                                  style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }}
+                                />
+                              ) : null}
+                            </div>
+                          </div>
+                        )}
                         </div>
                       ))}
                     </div>

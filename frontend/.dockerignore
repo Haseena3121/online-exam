@@ -1,10 +1,4 @@
-node_modules/
-build/
+node_modules
+build
+.env
 .git
-.gitignore
-*.md
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-npm-debug.log*

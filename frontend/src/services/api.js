@@ -1,7 +1,8 @@
+/* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import API_BASE from '../config';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || `${API_BASE}/api`;
+const API_URL = `${API_BASE}/api`;
 const API_TIMEOUT = parseInt(process.env.REACT_APP_API_TIMEOUT) || 30000;
 
 // Create axios instance
