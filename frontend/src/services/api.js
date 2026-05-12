@@ -1,6 +1,14 @@
 /* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import API_BASE from '../config';
 import axios from 'axios';
+import {
+  USE_MOCK_API,
+  mockAuthAPI,
+  mockExamAPI,
+  mockProctoringAPI,
+  mockViolationsAPI,
+  mockResultsAPI
+} from './mockApi';
 
 const API_URL = `${API_BASE}/api`;
 const API_TIMEOUT = parseInt(process.env.REACT_APP_API_TIMEOUT) || 30000;
@@ -43,8 +51,8 @@ api.interceptors.response.use(
 
 export default api;
 
-// Auth API
-export const authAPI = {
+// Auth API - uses mock when backend unavailable
+export const authAPI = USE_MOCK_API ? mockAuthAPI : {
   login: (email, password) => 
     api.post('/auth/login', { email, password }),
   register: (name, email, password, phone, role) =>
@@ -57,8 +65,8 @@ export const authAPI = {
     api.post('/auth/refresh-token')
 };
 
-// Exam API
-export const examAPI = {
+// Exam API - uses mock when backend unavailable
+export const examAPI = USE_MOCK_API ? mockExamAPI : {
   getAll: () =>
     api.get('/exams'),
   getById: (examId) =>
@@ -77,8 +85,8 @@ export const examAPI = {
     api.post(`/exams/${examId}/start`)
 };
 
-// Proctoring API
-export const proctoringAPI = {
+// Proctoring API - uses mock when backend unavailable
+export const proctoringAPI = USE_MOCK_API ? mockProctoringAPI : {
   reportViolation: (violationData) =>
     api.post('/proctoring/violation', violationData, {
       headers: { 'Content-Type': 'multipart/form-data' }
@@ -95,8 +103,8 @@ export const proctoringAPI = {
     api.post(`/proctoring/update-analytics/${sessionId}`, analyticsData)
 };
 
-// Violations API
-export const violationsAPI = {
+// Violations API - uses mock when backend unavailable
+export const violationsAPI = USE_MOCK_API ? mockViolationsAPI : {
   getHistory: (examId) =>
     api.get(`/violations/history/${examId}`),
   getByExam: (examId) =>
@@ -105,8 +113,8 @@ export const violationsAPI = {
     api.get(`/violations/${violationId}`)
 };
 
-// Results API
-export const resultsAPI = {
+// Results API - uses mock when backend unavailable
+export const resultsAPI = USE_MOCK_API ? mockResultsAPI : {
   getResult: (examId) =>
     api.get(`/results/${examId}`),
   getAllResults: () =>
