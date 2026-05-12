@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars, no-console, react-hooks/exhaustive-deps, no-useless-escape */
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Navbar.css';
 import shieldLogo from '../assets/shield-logo.jpg';
@@ -8,14 +8,15 @@ import shieldLogo from '../assets/shield-logo.jpg';
 function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  // Don't show navbar if not logged in
-  if (!user) return null;
+  // Don't show navbar if not logged in or on dashboard (which has its own sidebar)
+  if (!user || location.pathname === '/dashboard') return null;
 
   return (
     <nav className="navbar">
